@@ -96,6 +96,7 @@ export default function DashboardPage() {
           width={1200}
           height={200}
           activeTab={activeTab}
+          focusMode={focusMode}
           taskStats={getTaskStats(getFilteredTasksForGantt(), activeTab)}
         />
         

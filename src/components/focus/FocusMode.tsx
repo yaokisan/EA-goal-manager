@@ -144,17 +144,17 @@ export default function FocusMode({ isVisible, onClose }: FocusModeProps) {
   }
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
+    <div className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg p-4 shadow-sm text-white">
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-3">
-          <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-            <span className="text-blue-600 text-lg">🎯</span>
+          <div className="w-10 h-10 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
+            <span className="text-white text-xl">🎯</span>
           </div>
           <div>
-            <h3 className="text-base font-semibold text-gray-900">{focusData.title}</h3>
-            <p className="text-sm text-gray-600">
+            <h3 className="text-lg font-semibold text-white">{focusData.title}</h3>
+            <p className="text-sm text-blue-100 mt-1">
               期限: {new Date(focusData.deadline).toLocaleDateString('ja-JP')} 
-              <span className="ml-2 text-blue-600 font-medium">{getUrgencyText()}</span>
+              <span className="ml-2 text-white font-medium">({getUrgencyText()})</span>
             </p>
           </div>
         </div>
@@ -163,14 +163,14 @@ export default function FocusMode({ isVisible, onClose }: FocusModeProps) {
           <button
             onClick={() => setIsEditing(true)}
             disabled={loading}
-            className="text-gray-500 hover:text-gray-700 text-sm px-3 py-1 rounded border border-gray-300 hover:border-gray-400 transition-colors disabled:opacity-50"
+            className="text-white hover:text-blue-100 text-sm px-3 py-1 rounded border border-white border-opacity-30 hover:border-opacity-50 transition-colors disabled:opacity-50"
           >
             編集
           </button>
           {onClose && (
             <button
               onClick={onClose}
-              className="text-gray-500 hover:text-gray-700 text-sm px-3 py-1 rounded border border-gray-300 hover:border-gray-400 transition-colors"
+              className="text-white hover:text-blue-100 text-sm px-3 py-1 rounded border border-white border-opacity-30 hover:border-opacity-50 transition-colors"
             >
               閉じる
             </button>

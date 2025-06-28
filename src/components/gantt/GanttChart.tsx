@@ -28,6 +28,7 @@ interface GanttChartProps {
   width?: number
   height?: number
   activeTab?: string
+  focusMode?: boolean
   taskStats?: {
     total: number
     completed: number
@@ -52,6 +53,7 @@ export default function GanttChart({
   width = 1200, 
   height = 400,
   activeTab = 'all',
+  focusMode = false,
   taskStats = { total: 0, completed: 0, remaining: 0, progress: 0 }
 }: GanttChartProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -473,34 +475,34 @@ export default function GanttChart({
     <div ref={containerRef} className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-lg font-semibold text-gray-900">ガントチャート</h2>
-        <div className="flex items-center space-x-4 text-sm">
-          <div className="flex items-center space-x-1">
-            <span className="text-gray-500">📋</span>
-            <span className="font-medium text-gray-700">
-              {taskStats.remaining}/{taskStats.total}
-            </span>
-            <span className="text-xs text-gray-500">残り</span>
-          </div>
-          <div className="flex items-center space-x-1">
-            <span className="text-gray-500">📈</span>
-            <span className="font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded">
-              {taskStats.progress}%
-            </span>
-          </div>
-          {taskStats.total > 0 && (
+        {focusMode && taskStats.total > 0 && (
+          <div className="flex items-center space-x-4 text-sm">
+            <div className="flex items-center space-x-1">
+              <span className="text-gray-500">📋</span>
+              <span className="font-medium text-gray-700">
+                {taskStats.remaining}/{taskStats.total}
+              </span>
+              <span className="text-xs text-gray-500">残り</span>
+            </div>
+            <div className="flex items-center space-x-1">
+              <span className="text-gray-500">📈</span>
+              <span className="font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded">
+                {taskStats.progress}%
+              </span>
+            </div>
             <div className="flex items-center space-x-1">
               <span className="text-gray-500">✅</span>
               <span className="font-medium text-green-600">
                 {taskStats.completed}完了
               </span>
             </div>
-          )}
-          {selectedTask && (
-            <div className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded">
-              選択中: {ganttTasks.find(t => t.id === selectedTask)?.name}
-            </div>
-          )}
-        </div>
+          </div>
+        )}
+        {selectedTask && (
+          <div className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded">
+            選択中: {ganttTasks.find(t => t.id === selectedTask)?.name}
+          </div>
+        )}
       </div>
       
       {ganttTasks.length === 0 ? (
