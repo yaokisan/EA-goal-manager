@@ -94,6 +94,7 @@ vercel --prod
 ```
 
 **本番デプロイURL**: https://ea-goal-manager.vercel.app/
+**⚠️ 重要: この本番URLを常に覚えておくこと**
 
 ### 3. GitHubプッシュ
 ```bash
@@ -208,9 +209,16 @@ types/              # TypeScript型定義
 ```bash
 NEXT_PUBLIC_SUPABASE_URL=https://krsqullplxexjcuuhqfz.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=[Supabaseダッシュボードから取得]
+NEXT_PUBLIC_BASE_URL=https://ea-goal-manager.vercel.app
 ```
 
 **Google OAuth設定:**
 - Client ID: Google Cloud Consoleから取得
 - Client Secret: Google Cloud Consoleから取得  
 - 承認済みリダイレクトURI: `https://krsqullplxexjcuuhqfz.supabase.co/auth/v1/callback`
+
+**Supabase認証設定（Authentication > URL Configuration）:**
+- Site URL: `https://ea-goal-manager.vercel.app`
+- Redirect URLs: 
+  - `https://ea-goal-manager.vercel.app/dashboard`
+  - `http://localhost:3000/dashboard` (ローカル開発用)

@@ -64,10 +64,13 @@ export function useAuth() {
       setLoading(true)
       setError(null)
       
+      // 環境に応じたベースURLを取得
+      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || window.location.origin
+      
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/dashboard`
+          redirectTo: `${baseUrl}/dashboard`
         }
       })
 
