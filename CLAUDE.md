@@ -47,7 +47,70 @@ npm run type-check   # TypeScript型チェック
 # データベース
 npx supabase start   # ローカルSupabase起動
 npx supabase db push # スキーマ変更をプッシュ
+
+# Vercelデプロイ
+vercel                # プレビューデプロイ
+vercel --prod         # 本番デプロイ
+vercel login          # Vercelにログイン
 ```
+
+## デプロイフロー（必須）
+
+**⚠️ 重要: GitHubにプッシュする前に必ず以下の手順を実行してください**
+
+### 1. ローカルビルドテスト
+```bash
+# 1. 型チェック
+npm run type-check
+
+# 2. Lintチェック  
+npm run lint
+
+# 3. ビルドテスト
+npm run build
+
+# 4. ビルド成功後、起動テスト
+npm run start
+```
+
+### 2. Vercel CLIでデプロイテスト
+```bash
+# 1. Vercelにログイン（初回のみ）
+vercel login
+
+# 2. プレビューデプロイでテスト
+vercel
+
+# 3. 本番環境でテスト（慎重に）
+vercel --prod
+```
+
+**本番デプロイURL**: https://ea-goal-manager.vercel.app/
+
+### 3. GitHubプッシュ
+```bash
+# 1. 変更をステージング
+git add -A
+
+# 2. コミット
+git commit -m "feat: 機能説明
+
+🤖 Generated with [Claude Code](https://claude.ai/code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>"
+
+# 3. GitHubにプッシュ
+git push
+```
+
+### 4. 自動デプロイ確認
+- GitHub連携により自動デプロイが実行される
+- Vercelダッシュボードでデプロイ状況を確認
+- 本番URLで動作確認
+
+**注意事項:**
+- Vercel CLIでのテストデプロイ後は、必ずGitHubにプッシュして自動デプロイとの整合性を保つ
+- エラーが発生した場合は、ローカルでの修正 → ビルドテスト → Vercelテスト → GitHubプッシュの順で対応
 
 ## 主要機能と実装ノート
 

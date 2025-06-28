@@ -15,12 +15,12 @@
  * - プロジェクト追加ボタン
  */
 
+'use client'
+
 import Link from 'next/link'
 import Button from '@/components/ui/Button'
 import ProjectCard from '@/components/projects/ProjectCard'
 import { useProjects } from '@/hooks/useProjects'
-
-'use client'
 
 export default function ProjectsPage() {
   const { projects, loading, error } = useProjects()
