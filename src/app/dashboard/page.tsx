@@ -20,13 +20,17 @@
 
 import { useState } from 'react'
 import TaskList from '@/components/tasks/TaskList'
+import TaskCard from '@/components/tasks/TaskCard'
 import ProjectTabs from '@/components/dashboard/ProjectTabs'
+import GanttChart from '@/components/gantt/GanttChart'
 import { useTasks } from '@/hooks/useTasks'
+import { useProjects } from '@/hooks/useProjects'
 
 export default function DashboardPage() {
   const [activeTab, setActiveTab] = useState('recent')
   const [focusMode, setFocusMode] = useState(false)
-  const { getRecentTasks } = useTasks()
+  const { tasks, getRecentTasks } = useTasks()
+  const { projects } = useProjects()
 
   const getProjectIdForFilter = () => {
     if (activeTab === 'recent' || activeTab === 'all') {
@@ -43,6 +47,16 @@ export default function DashboardPage() {
         return 'すべてのタスク'
       default:
         return 'プロジェクトのタスク'
+    }
+  }
+
+  const getFilteredTasksForGantt = () => {
+    if (activeTab === 'recent') {
+      return getRecentTasks()
+    } else if (activeTab === 'all') {
+      return tasks
+    } else {
+      return tasks.filter(task => task.project_id === activeTab)
     }
   }
 
@@ -84,25 +98,13 @@ export default function DashboardPage() {
       
       {/* ガントチャートとタスクリスト */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* ガントチャート（仮実装） */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-gray-900">ガントチャート</h2>
-            <div className="flex items-center space-x-4 text-sm">
-              <div className="flex items-center space-x-1">
-                <span>📋</span>
-                <span className="font-medium">8/12</span>
-              </div>
-              <div className="flex items-center space-x-1">
-                <span>📈</span>
-                <span className="font-medium text-green-600 bg-green-50 px-2 py-0.5 rounded">67%</span>
-              </div>
-            </div>
-          </div>
-          <div className="h-64 bg-gray-50 rounded flex items-center justify-center text-gray-500">
-            ガントチャート実装予定
-          </div>
-        </div>
+        {/* ガントチャート */}
+        <GanttChart
+          tasks={getFilteredTasksForGantt()}
+          projects={projects}
+          width={500}
+          height={300}
+        />
         
         {/* タスクリスト */}
         <FilteredTaskList
@@ -123,30 +125,9 @@ interface FilteredTaskListProps {
 }
 
 function FilteredTaskList({ activeTab, projectId, title }: FilteredTaskListProps) {
-  const { getRecentTasks } = useTasks()
-
   if (activeTab === 'recent') {
-    const recentTasks = getRecentTasks()
     return (
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">{title}</h2>
-        <div className="space-y-3">
-          {recentTasks.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">
-              <p>直近1週間に期限が迫っているタスクはありません</p>
-            </div>
-          ) : (
-            recentTasks.map(task => (
-              <div key={task.id} className="border border-red-200 rounded-lg p-3 bg-red-50">
-                <div className="font-medium text-red-900">{task.name}</div>
-                <div className="text-sm text-red-700 mt-1">
-                  期限: {new Date(task.end_date).toLocaleDateString('ja-JP')}
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-      </div>
+      <RecentTaskList title={title} />
     )
   }
 
@@ -156,5 +137,134 @@ function FilteredTaskList({ activeTab, projectId, title }: FilteredTaskListProps
       title={title}
       showAddButton={true}
     />
+  )
+}
+
+// 直近1週間タスクリストコンポーネント
+interface RecentTaskListProps {
+  title: string
+}
+
+function RecentTaskList({ title }: RecentTaskListProps) {
+  const { getRecentTasks, updateTask, toggleTaskStatus, copyTasksToNotion } = useTasks()
+  const { projects } = useProjects()
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null)
+  const [isMultiSelectMode, setIsMultiSelectMode] = useState(false)
+  const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([])
+  const [copyFeedback, setCopyFeedback] = useState<string | null>(null)
+
+  const recentTasks = getRecentTasks()
+
+  const getProjectForTask = (task: any) => {
+    return projects.find(p => p.id === task.project_id)
+  }
+
+  const handleEditTask = (taskId: string) => {
+    setEditingTaskId(taskId)
+  }
+
+  const handleSaveTask = async (taskId: string, data: any) => {
+    try {
+      await updateTask(taskId, data)
+      setEditingTaskId(null)
+    } catch (error) {
+      console.error('タスク更新エラー:', error)
+    }
+  }
+
+  const handleCancelEdit = () => {
+    setEditingTaskId(null)
+  }
+
+  const handleSelectTask = (taskId: string) => {
+    if (!isMultiSelectMode) return
+    
+    setSelectedTaskIds(prev => 
+      prev.includes(taskId) 
+        ? prev.filter(id => id !== taskId)
+        : [...prev, taskId]
+    )
+  }
+
+  const handleCopyTask = (taskId: string) => {
+    copyTasksToNotion([taskId])
+    showCopyFeedback()
+  }
+
+  const handleBulkCopy = () => {
+    copyTasksToNotion(selectedTaskIds)
+    setSelectedTaskIds([])
+    setIsMultiSelectMode(false)
+    showCopyFeedback()
+  }
+
+  const showCopyFeedback = () => {
+    setCopyFeedback('コピー済み')
+    setTimeout(() => setCopyFeedback(null), 1500)
+  }
+
+  const toggleMultiSelectMode = () => {
+    setIsMultiSelectMode(!isMultiSelectMode)
+    setSelectedTaskIds([])
+  }
+
+  return (
+    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+      {/* ヘッダー */}
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
+        <div className="flex items-center space-x-2">
+          {/* コピーフィードバック */}
+          {copyFeedback && (
+            <span className="text-sm text-green-600 font-medium">
+              {copyFeedback}
+            </span>
+          )}
+          
+          {/* 複数選択モード */}
+          <button
+            onClick={toggleMultiSelectMode}
+            className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50"
+          >
+            {isMultiSelectMode ? '選択終了' : '複数選択'}
+          </button>
+          
+          {/* 一括コピーボタン */}
+          {isMultiSelectMode && selectedTaskIds.length > 0 && (
+            <button
+              onClick={handleBulkCopy}
+              className="px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600"
+            >
+              選択をコピー ({selectedTaskIds.length})
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* タスクリスト */}
+      <div className="space-y-3">
+        {recentTasks.length === 0 ? (
+          <div className="text-center py-8 text-gray-500">
+            <p>直近1週間に期限が迫っているタスクはありません</p>
+          </div>
+        ) : (
+          recentTasks.map(task => (
+            <TaskCard
+              key={task.id}
+              task={task}
+              project={getProjectForTask(task)}
+              isEditing={editingTaskId === task.id}
+              isSelected={selectedTaskIds.includes(task.id)}
+              onEdit={() => handleEditTask(task.id)}
+              onSave={(data) => handleSaveTask(task.id, data)}
+              onCancel={handleCancelEdit}
+              onToggleStatus={() => toggleTaskStatus(task.id)}
+              onSelect={() => handleSelectTask(task.id)}
+              onCopy={() => handleCopyTask(task.id)}
+            />
+          ))
+        )}
+      </div>
+    </div>
   )
 }
