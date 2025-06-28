@@ -75,7 +75,7 @@ export function useSalesTargets() {
 
       // 新しい売上目標を挿入
       const targetData = Object.entries(targets)
-        .filter(([_, amount]) => amount > 0) // 0より大きい値のみ保存
+        .filter(([_, amount]) => amount >= 0) // 0以上の値を保存（0も含む）
         .map(([yearMonth, amount]) => ({
           project_id: projectId,
           year_month: yearMonth,

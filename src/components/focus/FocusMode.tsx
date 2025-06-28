@@ -202,14 +202,6 @@ export default function FocusMode({ isVisible, onClose }: FocusModeProps) {
           >
             編集
           </button>
-          {onClose && (
-            <button
-              onClick={onClose}
-              className="text-white hover:text-blue-100 text-sm px-3 py-1 rounded border border-white border-opacity-30 hover:border-opacity-50 transition-colors"
-            >
-              閉じる
-            </button>
-          )}
         </div>
       </div>
     </div>

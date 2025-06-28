@@ -17,7 +17,7 @@
 
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { Task, Project } from '@/types'
 import Tag from '@/components/ui/Tag'
 
@@ -50,6 +50,7 @@ export default function TaskCard({
   onSelect,
   onCopy,
 }: TaskCardProps) {
+  const editFormRef = useRef<HTMLDivElement>(null)
   const [editData, setEditData] = useState({
     name: task.name,
     assignees: task.assignees || [],
@@ -63,15 +64,42 @@ export default function TaskCard({
     }
   }
 
+  const [enterPressCount, setEnterPressCount] = useState(0)
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
-      handleSave()
+      setEnterPressCount(prev => prev + 1)
+      
+      // 2回目のEnterで保存
+      if (enterPressCount >= 1) {
+        handleSave()
+        setEnterPressCount(0)
+      }
     } else if (e.key === 'Escape') {
       e.preventDefault()
       onCancel?.()
+    } else {
+      // 他のキーが押されたらEnterカウントをリセット
+      setEnterPressCount(0)
     }
   }
+
+  // 外側クリックで保存
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (isEditing && editFormRef.current && !editFormRef.current.contains(event.target as Node)) {
+        handleSave()
+      }
+    }
+
+    if (isEditing) {
+      document.addEventListener('mousedown', handleClickOutside)
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside)
+      }
+    }
+  }, [isEditing, editData])
 
   const formatDateRange = (startDate: string, endDate: string) => {
     const start = new Date(startDate).toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric' })
@@ -103,7 +131,7 @@ export default function TaskCard({
 
   if (isEditing) {
     return (
-      <div className={cardClass}>
+      <div ref={editFormRef} className={cardClass}>
         <div className="space-y-3">
           {/* タスク名編集 */}
           <input
@@ -208,7 +236,7 @@ export default function TaskCard({
         <div className="flex-1 min-w-0">
           <h3 
             className={`font-medium ${task.status === 'completed' ? 'line-through' : ''} cursor-pointer`}
-            onDoubleClick={onEdit}
+            onClick={onEdit}
           >
             {task.name}
           </h3>

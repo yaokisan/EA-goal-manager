@@ -49,7 +49,14 @@ export function useTasks(projectId?: string) {
         .order('created_at', { ascending: false })
 
       if (error) throw error
-      setAllTasks(data || [])
+      
+      // assigneeからassigneesへの互換性変換
+      const tasksWithAssignees = (data || []).map(task => ({
+        ...task,
+        assignees: task.assignees || (task.assignee ? [task.assignee] : [])
+      }))
+      
+      setAllTasks(tasksWithAssignees)
     } catch (err) {
       console.error('タスク取得エラー:', err)
       setError('タスクの取得に失敗しました')
@@ -86,8 +93,14 @@ export function useTasks(projectId?: string) {
 
       if (error) throw error
       
-      setAllTasks(prev => [createdTask, ...prev])
-      return createdTask
+      // assigneeからassigneesへの互換性変換
+      const taskWithAssignees = {
+        ...createdTask,
+        assignees: createdTask.assignees || (createdTask.assignee ? [createdTask.assignee] : [])
+      }
+      
+      setAllTasks(prev => [taskWithAssignees, ...prev])
+      return taskWithAssignees
     } catch (err) {
       console.error('タスク作成エラー:', err)
       setError('タスクの作成に失敗しました')
@@ -129,8 +142,14 @@ export function useTasks(projectId?: string) {
 
       if (error) throw error
       
+      // assigneeからassigneesへの互換性変換
+      const taskWithAssignees = {
+        ...updatedTask,
+        assignees: updatedTask.assignees || (updatedTask.assignee ? [updatedTask.assignee] : [])
+      }
+      
       setAllTasks(prev => prev.map(task => 
-        task.id === id ? updatedTask : task
+        task.id === id ? taskWithAssignees : task
       ))
     } catch (err) {
       console.error('タスク更新エラー:', err)

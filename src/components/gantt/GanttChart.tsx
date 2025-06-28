@@ -106,6 +106,18 @@ export default function GanttChart({
     const today = new Date()
     today.setHours(0, 0, 0, 0)
     
+    // 直近1週間タブの場合は本日から1週間固定
+    if (activeTab === 'recent') {
+      const weekEnd = new Date(today)
+      weekEnd.setDate(weekEnd.getDate() + 6) // 今日から6日後（計7日間）
+      
+      return {
+        minDate: today,
+        maxDate: weekEnd,
+        totalDays: 7
+      }
+    }
+    
     if (focusMode && focusData?.deadline) {
       // フォーカスモードの場合、今日から期限までの期間を表示
       const deadlineDate = new Date(focusData.deadline)
@@ -170,7 +182,7 @@ export default function GanttChart({
       maxDate: finalMaxDate,
       totalDays: Math.max(days, 90)
     }
-  }, [ganttTasks, selectedPeriod, focusMode, focusData])
+  }, [ganttTasks, selectedPeriod, focusMode, focusData, activeTab])
 
   // 日付グリッドを生成
   const dateGrid = useMemo(() => {
