@@ -17,14 +17,46 @@
 
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { Task } from '@/types'
-import { mockTasks, MOCK_USER_ID } from '@/lib/mockData'
+import { createClient } from '@/lib/supabase/client'
+import { useAuth } from '@/hooks/useAuth'
 
 export function useTasks(projectId?: string) {
-  const [allTasks, setAllTasks] = useState<Task[]>(mockTasks)
+  const [allTasks, setAllTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const supabase = createClient()
+  const { user } = useAuth()
+
+  // 初期データ読み込み
+  useEffect(() => {
+    if (user) {
+      fetchTasks()
+    }
+  }, [user])
+
+  // タスク一覧取得
+  const fetchTasks = useCallback(async () => {
+    if (!user) return
+    
+    try {
+      setLoading(true)
+      const { data, error } = await supabase
+        .from('tasks')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+
+      if (error) throw error
+      setAllTasks(data || [])
+    } catch (err) {
+      console.error('タスク取得エラー:', err)
+      setError('タスクの取得に失敗しました')
+    } finally {
+      setLoading(false)
+    }
+  }, [supabase, user])
 
   // プロジェクトでフィルタリングしたタスク
   const tasks = projectId 
@@ -33,85 +65,107 @@ export function useTasks(projectId?: string) {
 
   // タスク作成
   const createTask = useCallback(async (data: Omit<Task, 'id' | 'user_id' | 'created_at' | 'updated_at' | 'completed_at'>) => {
+    if (!user) throw new Error('認証が必要です')
+    
     setLoading(true)
     setError(null)
     
     try {
-      await new Promise(resolve => setTimeout(resolve, 300))
-      
-      const newTask: Task = {
+      const newTaskData = {
         ...data,
-        id: `task-${Date.now()}`,
-        user_id: MOCK_USER_ID,
-        status: 'pending',
+        user_id: user.id,
+        status: 'pending' as const,
         completed_at: null,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
       }
+
+      const { data: createdTask, error } = await supabase
+        .from('tasks')
+        .insert([newTaskData])
+        .select()
+        .single()
+
+      if (error) throw error
       
-      setAllTasks(prev => [newTask, ...prev])
-      return newTask
+      setAllTasks(prev => [createdTask, ...prev])
+      return createdTask
     } catch (err) {
+      console.error('タスク作成エラー:', err)
       setError('タスクの作成に失敗しました')
       throw err
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [supabase, user])
 
   // タスク更新
   const updateTask = useCallback(async (id: string, data: Partial<Omit<Task, 'id' | 'user_id' | 'created_at'>>) => {
+    if (!user) throw new Error('認証が必要です')
+    
     setLoading(true)
     setError(null)
     
     try {
-      await new Promise(resolve => setTimeout(resolve, 200))
+      const currentTask = allTasks.find(task => task.id === id)
+      if (!currentTask) throw new Error('タスクが見つかりません')
+
+      const updateData = { ...data }
       
-      setAllTasks(prev => prev.map(task => {
-        if (task.id === id) {
-          const updatedTask = { 
-            ...task, 
-            ...data, 
-            updated_at: new Date().toISOString() 
-          }
-          
-          // ステータスがcompletedに変更された場合、completed_atを設定
-          if (data.status === 'completed' && task.status !== 'completed') {
-            updatedTask.completed_at = new Date().toISOString()
-          }
-          // ステータスがpendingに戻された場合、completed_atをクリア
-          if (data.status === 'pending' && task.status === 'completed') {
-            updatedTask.completed_at = null
-          }
-          
-          return updatedTask
-        }
-        return task
-      }))
+      // ステータスがcompletedに変更された場合、completed_atを設定
+      if (data.status === 'completed' && currentTask.status !== 'completed') {
+        updateData.completed_at = new Date().toISOString()
+      }
+      // ステータスがpendingに戻された場合、completed_atをクリア
+      if (data.status === 'pending' && currentTask.status === 'completed') {
+        updateData.completed_at = null
+      }
+
+      const { data: updatedTask, error } = await supabase
+        .from('tasks')
+        .update(updateData)
+        .eq('id', id)
+        .eq('user_id', user.id)
+        .select()
+        .single()
+
+      if (error) throw error
+      
+      setAllTasks(prev => prev.map(task => 
+        task.id === id ? updatedTask : task
+      ))
     } catch (err) {
+      console.error('タスク更新エラー:', err)
       setError('タスクの更新に失敗しました')
       throw err
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [allTasks, supabase, user])
 
   // タスク削除
   const deleteTask = useCallback(async (id: string) => {
+    if (!user) throw new Error('認証が必要です')
+    
     setLoading(true)
     setError(null)
     
     try {
-      await new Promise(resolve => setTimeout(resolve, 200))
+      const { error } = await supabase
+        .from('tasks')
+        .delete()
+        .eq('id', id)
+        .eq('user_id', user.id)
+
+      if (error) throw error
       
       setAllTasks(prev => prev.filter(task => task.id !== id))
     } catch (err) {
+      console.error('タスク削除エラー:', err)
       setError('タスクの削除に失敗しました')
       throw err
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [supabase, user])
 
   // タスクステータス切り替え
   const toggleTaskStatus = useCallback(async (id: string) => {
@@ -173,5 +227,6 @@ export function useTasks(projectId?: string) {
     getPendingTasks,
     getRecentTasks,
     copyTasksToNotion,
+    fetchTasks, // データ再取得用
   }
 }

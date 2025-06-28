@@ -19,9 +19,10 @@
 
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Project } from '@/types'
 import { useProjects } from '@/hooks/useProjects'
+import { useSalesTargets } from '@/hooks/useSalesTargets'
 
 interface ProjectTabsProps {
   activeTab: string
@@ -37,6 +38,7 @@ export default function ProjectTabs({
   onFocusModeToggle
 }: ProjectTabsProps) {
   const { projects } = useProjects()
+  const { fetchSalesTargets, getProjectSalesTargets } = useSalesTargets()
 
   const tabs = [
     { id: 'recent', label: '📅 直近1週間', isSpecial: true },
@@ -64,6 +66,35 @@ export default function ProjectTabs({
   }
 
   const selectedProject = projects.find(p => p.id === activeTab)
+  
+  // 現在の月から3ヶ月分の月を取得
+  const getNext3Months = () => {
+    const months = []
+    const today = new Date()
+    
+    for (let i = 0; i < 3; i++) {
+      const date = new Date(today.getFullYear(), today.getMonth() + i, 1)
+      const yearMonth = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+      const label = `${date.getMonth() + 1}月目標`
+      months.push({ yearMonth, label })
+    }
+    
+    return months
+  }
+  
+  // プロジェクトの売上目標を取得
+  useEffect(() => {
+    if (selectedProject) {
+      fetchSalesTargets(selectedProject.id)
+    }
+  }, [selectedProject, fetchSalesTargets])
+  
+  // 売上目標データを取得
+  const getSalesTargetForMonth = (projectId: string, yearMonth: string) => {
+    const targets = getProjectSalesTargets(projectId)
+    const target = targets.find(t => t.year_month === yearMonth)
+    return target ? target.target_amount : 0
+  }
 
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200">
@@ -115,18 +146,17 @@ export default function ProjectTabs({
           <p className="text-sm text-gray-600 mb-3">{selectedProject.description}</p>
           
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
-            <div className="bg-white rounded p-3">
-              <div className="text-gray-600">ステータス</div>
-              <div className="font-semibold capitalize">{selectedProject.status}</div>
-            </div>
-            <div className="bg-white rounded p-3">
-              <div className="text-gray-600">今月目標</div>
-              <div className="font-semibold">¥1,000,000</div>
-            </div>
-            <div className="bg-white rounded p-3">
-              <div className="text-gray-600">来月目標</div>
-              <div className="font-semibold">¥1,200,000</div>
-            </div>
+            {getNext3Months().map((month) => {
+              const amount = getSalesTargetForMonth(selectedProject.id, month.yearMonth)
+              return (
+                <div key={month.yearMonth} className="bg-white rounded p-3">
+                  <div className="text-gray-600">{month.label}</div>
+                  <div className="font-semibold">
+                    {amount > 0 ? `¥${amount.toLocaleString()}` : '未設定'}
+                  </div>
+                </div>
+              )
+            })}
           </div>
         </div>
       )}
@@ -145,18 +175,21 @@ export default function ProjectTabs({
       {activeTab === 'all' && (
         <div className="p-4 bg-blue-50 border-b border-gray-200">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
-            <div>
-              <span className="text-gray-600">今月目標：</span>
-              <span className="font-semibold">¥1,000,000</span>
-            </div>
-            <div>
-              <span className="text-gray-600">来月目標：</span>
-              <span className="font-semibold">¥1,200,000</span>
-            </div>
-            <div>
-              <span className="text-gray-600">再来月目標：</span>
-              <span className="font-semibold">¥1,500,000</span>
-            </div>
+            {getNext3Months().map((month, index) => {
+              // 全プロジェクトの目標の合計を計算
+              const totalAmount = projects.reduce((total, project) => {
+                return total + getSalesTargetForMonth(project.id, month.yearMonth)
+              }, 0)
+              
+              return (
+                <div key={month.yearMonth}>
+                  <span className="text-gray-600">{month.label}：</span>
+                  <span className="font-semibold">
+                    {totalAmount > 0 ? `¥${totalAmount.toLocaleString()}` : '未設定'}
+                  </span>
+                </div>
+              )
+            })}
           </div>
         </div>
       )}

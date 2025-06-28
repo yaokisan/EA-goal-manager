@@ -16,83 +16,135 @@
 
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { Project } from '@/types'
-import { mockProjects, MOCK_USER_ID } from '@/lib/mockData'
+import { createClient } from '@/lib/supabase/client'
+import { useAuth } from '@/hooks/useAuth'
 
 export function useProjects() {
-  const [projects, setProjects] = useState<Project[]>(mockProjects)
+  const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const supabase = createClient()
+  const { user } = useAuth()
+
+  // 初期データ読み込み
+  useEffect(() => {
+    if (user) {
+      fetchProjects()
+    }
+  }, [user])
+
+  // プロジェクト一覧取得
+  const fetchProjects = useCallback(async () => {
+    if (!user) return
+    
+    try {
+      setLoading(true)
+      const { data, error } = await supabase
+        .from('projects')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+
+      if (error) throw error
+      setProjects(data || [])
+    } catch (err) {
+      console.error('プロジェクト取得エラー:', err)
+      setError('プロジェクトの取得に失敗しました')
+    } finally {
+      setLoading(false)
+    }
+  }, [supabase, user])
 
   // プロジェクト作成
   const createProject = useCallback(async (data: Omit<Project, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => {
+    if (!user) throw new Error('認証が必要です')
+    
     setLoading(true)
     setError(null)
     
     try {
-      // モック用の遅延
-      await new Promise(resolve => setTimeout(resolve, 500))
-      
-      const newProject: Project = {
+      const newProjectData = {
         ...data,
-        id: `project-${Date.now()}`,
-        user_id: MOCK_USER_ID,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
+        user_id: user.id,
+        members: data.members || [], // メンバー情報のデフォルト値を設定
       }
+
+      const { data: createdProject, error } = await supabase
+        .from('projects')
+        .insert([newProjectData])
+        .select()
+        .single()
+
+      if (error) throw error
       
-      setProjects(prev => [newProject, ...prev])
-      return newProject
+      setProjects(prev => [createdProject, ...prev])
+      return createdProject
     } catch (err) {
+      console.error('プロジェクト作成エラー:', err)
       setError('プロジェクトの作成に失敗しました')
       throw err
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [supabase, user])
 
   // プロジェクト更新
   const updateProject = useCallback(async (id: string, data: Partial<Omit<Project, 'id' | 'user_id' | 'created_at'>>) => {
+    if (!user) throw new Error('認証が必要です')
+    
     setLoading(true)
     setError(null)
     
     try {
-      await new Promise(resolve => setTimeout(resolve, 300))
+      const { data: updatedProject, error } = await supabase
+        .from('projects')
+        .update(data)
+        .eq('id', id)
+        .eq('user_id', user.id)
+        .select()
+        .single()
+
+      if (error) throw error
       
       setProjects(prev => prev.map(project => 
-        project.id === id 
-          ? { 
-              ...project, 
-              ...data, 
-              updated_at: new Date().toISOString() 
-            }
-          : project
+        project.id === id ? updatedProject : project
       ))
     } catch (err) {
+      console.error('プロジェクト更新エラー:', err)
       setError('プロジェクトの更新に失敗しました')
       throw err
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [supabase, user])
 
   // プロジェクト削除
   const deleteProject = useCallback(async (id: string) => {
+    if (!user) throw new Error('認証が必要です')
+    
     setLoading(true)
     setError(null)
     
     try {
-      await new Promise(resolve => setTimeout(resolve, 300))
+      const { error } = await supabase
+        .from('projects')
+        .delete()
+        .eq('id', id)
+        .eq('user_id', user.id)
+
+      if (error) throw error
       
       setProjects(prev => prev.filter(project => project.id !== id))
     } catch (err) {
+      console.error('プロジェクト削除エラー:', err)
       setError('プロジェクトの削除に失敗しました')
       throw err
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [supabase, user])
 
   // 単一プロジェクト取得
   const getProject = useCallback((id: string) => {
@@ -113,5 +165,6 @@ export function useProjects() {
     deleteProject,
     getProject,
     getActiveProjects,
+    fetchProjects, // データ再取得用
   }
 }

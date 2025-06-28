@@ -24,6 +24,7 @@ import Tag from '@/components/ui/Tag'
 interface TaskCardProps {
   task: Task
   project?: Project
+  availableMembers?: string[]
   isEditing?: boolean
   isSelected?: boolean
   showCheckbox?: boolean
@@ -38,6 +39,7 @@ interface TaskCardProps {
 export default function TaskCard({
   task,
   project,
+  availableMembers = [],
   isEditing = false,
   isSelected = false,
   showCheckbox = true,
@@ -117,14 +119,29 @@ export default function TaskCard({
           
           {/* メタ情報編集 */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-sm">
-            <input
-              type="text"
-              value={editData.assignee}
-              onChange={(e) => setEditData({ ...editData, assignee: e.target.value })}
-              onKeyDown={handleKeyDown}
-              className="px-2 py-1 border border-gray-300 rounded text-sm"
-              placeholder="担当者"
-            />
+            {availableMembers.length > 0 ? (
+              <select
+                value={editData.assignee}
+                onChange={(e) => setEditData({ ...editData, assignee: e.target.value })}
+                className="px-2 py-1 border border-gray-300 rounded text-sm"
+              >
+                <option value="">担当者を選択</option>
+                {availableMembers.map((member) => (
+                  <option key={member} value={member}>
+                    {member}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <input
+                type="text"
+                value={editData.assignee}
+                onChange={(e) => setEditData({ ...editData, assignee: e.target.value })}
+                onKeyDown={handleKeyDown}
+                className="px-2 py-1 border border-gray-300 rounded text-sm"
+                placeholder="担当者"
+              />
+            )}
             <input
               type="date"
               value={editData.start_date}

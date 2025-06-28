@@ -153,6 +153,12 @@ function RecentTaskList({ title }: RecentTaskListProps) {
     return projects.find(p => p.id === task.project_id)
   }
 
+  // タスクに関連するプロジェクトのメンバーを取得
+  const getAvailableMembersForTask = (task: any): string[] => {
+    const taskProject = getProjectForTask(task)
+    return taskProject?.members || []
+  }
+
   const handleEditTask = (taskId: string) => {
     setEditingTaskId(taskId)
   }
@@ -247,6 +253,7 @@ function RecentTaskList({ title }: RecentTaskListProps) {
               key={task.id}
               task={task}
               project={getProjectForTask(task)}
+              availableMembers={getAvailableMembersForTask(task)}
               isEditing={editingTaskId === task.id}
               isSelected={selectedTaskIds.includes(task.id)}
               onEdit={() => handleEditTask(task.id)}

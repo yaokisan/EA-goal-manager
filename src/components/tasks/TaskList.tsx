@@ -53,6 +53,26 @@ export default function TaskList({
     return projects.find(p => p.id === task.project_id)
   }
 
+  // タスクに関連するプロジェクトのメンバーを取得
+  const getAvailableMembersForTask = (task: Task): string[] => {
+    const taskProject = getProjectForTask(task)
+    return taskProject?.members || []
+  }
+
+  // 新規タスク作成時の利用可能メンバーを取得
+  const getAvailableMembersForNewTask = (): string[] => {
+    if (projectId) {
+      const project = projects.find(p => p.id === projectId)
+      return project?.members || []
+    }
+    // プロジェクト指定がない場合は全プロジェクトのメンバーを統合
+    const allMembers = new Set<string>()
+    projects.forEach(project => {
+      project.members?.forEach(member => allMembers.add(member))
+    })
+    return Array.from(allMembers)
+  }
+
   const handleAddTask = async (data: Omit<Task, 'id' | 'user_id' | 'created_at' | 'updated_at' | 'completed_at'>) => {
     try {
       await createTask(data)
@@ -164,6 +184,7 @@ export default function TaskList({
           <NewTaskForm
             projectId={projectId}
             projects={projects}
+            availableMembers={getAvailableMembersForNewTask()}
             onSave={handleAddTask}
             onCancel={handleCancelEdit}
             loading={loading}
@@ -178,6 +199,7 @@ export default function TaskList({
             key={task.id}
             task={task}
             project={getProjectForTask(task)}
+            availableMembers={getAvailableMembersForTask(task)}
             isEditing={editingTaskId === task.id}
             isSelected={selectedTaskIds.includes(task.id)}
             onEdit={() => handleEditTask(task.id)}
@@ -210,6 +232,7 @@ export default function TaskList({
                   key={task.id}
                   task={task}
                   project={getProjectForTask(task)}
+                  availableMembers={getAvailableMembersForTask(task)}
                   onToggleStatus={() => toggleTaskStatus(task.id)}
                   onCopy={() => handleCopyTask(task.id)}
                 />
@@ -243,12 +266,13 @@ export default function TaskList({
 interface NewTaskFormProps {
   projectId?: string
   projects: Project[]
+  availableMembers: string[]
   onSave: (data: Omit<Task, 'id' | 'user_id' | 'created_at' | 'updated_at' | 'completed_at'>) => void
   onCancel: () => void
   loading: boolean
 }
 
-function NewTaskForm({ projectId, projects, onSave, onCancel, loading }: NewTaskFormProps) {
+function NewTaskForm({ projectId, projects, availableMembers, onSave, onCancel, loading }: NewTaskFormProps) {
   const [formData, setFormData] = useState({
     name: '',
     project_id: projectId || (projects[0]?.id || ''),
@@ -303,14 +327,29 @@ function NewTaskForm({ projectId, projects, onSave, onCancel, loading }: NewTask
               ))}
             </select>
           )}
-          <input
-            type="text"
-            value={formData.assignee}
-            onChange={(e) => setFormData({ ...formData, assignee: e.target.value })}
-            onKeyDown={handleKeyDown}
-            className="px-2 py-1 border border-gray-300 rounded text-sm"
-            placeholder="担当者"
-          />
+          {availableMembers.length > 0 ? (
+            <select
+              value={formData.assignee}
+              onChange={(e) => setFormData({ ...formData, assignee: e.target.value })}
+              className="px-2 py-1 border border-gray-300 rounded text-sm"
+            >
+              <option value="">担当者を選択</option>
+              {availableMembers.map((member) => (
+                <option key={member} value={member}>
+                  {member}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <input
+              type="text"
+              value={formData.assignee}
+              onChange={(e) => setFormData({ ...formData, assignee: e.target.value })}
+              onKeyDown={handleKeyDown}
+              className="px-2 py-1 border border-gray-300 rounded text-sm"
+              placeholder="担当者"
+            />
+          )}
           <input
             type="date"
             value={formData.start_date}

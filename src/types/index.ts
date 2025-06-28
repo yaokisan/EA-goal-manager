@@ -21,6 +21,9 @@ export interface Project {
   status: 'active' | 'inactive'
   color: string
   user_id: string
+  members: string[] // メンバー名の配列
+  target_start_month?: string // 目標期間開始月 "2025-06"
+  target_end_month?: string // 目標期間終了月 "2025-12"
   created_at: string
   updated_at: string
   // フロントエンド拡張

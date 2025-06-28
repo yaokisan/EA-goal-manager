@@ -7,11 +7,13 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "seed": "node scripts/seed-data.js"
   },
   "dependencies": {
     "@supabase/ssr": "^0.6.1",
     "@supabase/supabase-js": "^2.45.4",
+    "dotenv": "^17.0.0",
     "next": "14.2.8",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"

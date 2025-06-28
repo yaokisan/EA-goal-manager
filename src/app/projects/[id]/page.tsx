@@ -24,12 +24,13 @@ import { Project } from '@/types'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import Tag from '@/components/ui/Tag'
-import { getProjectSalesTargets } from '@/lib/mockData'
+import { useSalesTargets } from '@/hooks/useSalesTargets'
 
 export default function ProjectEditPage() {
   const params = useParams()
   const router = useRouter()
   const { getProject, updateProject, deleteProject, loading } = useProjects()
+  const { fetchSalesTargets, saveSalesTargets, getProjectSalesTargets, loading: salesLoading } = useSalesTargets()
   
   const projectId = params.id as string
   const project = getProject(projectId)
@@ -39,6 +40,8 @@ export default function ProjectEditPage() {
     description: '',
     status: 'active' as 'active' | 'inactive',
     color: '#667eea',
+    target_start_month: '',
+    target_end_month: '',
   })
   
   const [members, setMembers] = useState<string[]>([])
@@ -52,20 +55,27 @@ export default function ProjectEditPage() {
         description: project.description || '',
         status: project.status,
         color: project.color,
+        target_start_month: project.target_start_month || '',
+        target_end_month: project.target_end_month || '',
       })
       
-      // モックデータから売上目標を取得
-      const targets = getProjectSalesTargets(projectId)
-      const targetMap: { [key: string]: number } = {}
-      targets.forEach(target => {
-        targetMap[target.year_month] = target.target_amount
-      })
-      setSalesTargets(targetMap)
+      // データベースから取得したメンバー情報を設定
+      setMembers(project.members || [])
       
-      // モックメンバーデータ
-      setMembers(['山田太郎', '鈴木花子', '佐藤次郎'])
+      // 売上目標データを取得
+      fetchSalesTargets(projectId)
     }
-  }, [project, projectId])
+  }, [project, projectId, fetchSalesTargets])
+
+  // 売上目標データが更新された時にローカル状態を更新
+  useEffect(() => {
+    const targets = getProjectSalesTargets(projectId)
+    const targetMap: { [key: string]: number } = {}
+    targets.forEach(target => {
+      targetMap[target.year_month] = target.target_amount
+    })
+    setSalesTargets(targetMap)
+  }, [getProjectSalesTargets, projectId])
   
   if (!project) {
     return (
@@ -78,7 +88,17 @@ export default function ProjectEditPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     try {
-      await updateProject(projectId, formData)
+      // プロジェクト基本情報とメンバー情報を更新
+      await updateProject(projectId, {
+        ...formData,
+        members
+      })
+
+      // 売上目標を保存
+      if (Object.keys(salesTargets).length > 0) {
+        await saveSalesTargets(projectId, salesTargets)
+      }
+
       router.push('/projects')
     } catch (error) {
       console.error('プロジェクト更新エラー:', error)
@@ -107,18 +127,27 @@ export default function ProjectEditPage() {
     setMembers(members.filter(m => m !== member))
   }
   
-  // 直近3ヶ月の年月を生成
-  const getRecentMonths = () => {
-    const months = []
-    const now = new Date()
-    for (let i = 0; i < 3; i++) {
-      const date = new Date(now.getFullYear(), now.getMonth() + i, 1)
-      const yearMonth = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+  // 設定された期間の年月を生成
+  const getTargetMonths = (): { key: string; label: string }[] => {
+    const months: { key: string; label: string }[] = []
+    
+    if (!formData.target_start_month || !formData.target_end_month) {
+      return months
+    }
+
+    const startDate = new Date(formData.target_start_month + '-01')
+    const endDate = new Date(formData.target_end_month + '-01')
+    
+    const current = new Date(startDate)
+    while (current <= endDate) {
+      const yearMonth = `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, '0')}`
       months.push({
         key: yearMonth,
-        label: `${date.getFullYear()}年${date.getMonth() + 1}月`
+        label: `${current.getFullYear()}年${current.getMonth() + 1}月`
       })
+      current.setMonth(current.getMonth() + 1)
     }
+    
     return months
   }
   
@@ -203,30 +232,64 @@ export default function ProjectEditPage() {
           </div>
         </div>
         
-        {/* 月別売上目標 */}
+        {/* 目標期間設定 */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">月別売上目標</h2>
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">目標期間設定</h2>
           
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {getRecentMonths().map((month) => (
-              <div key={month.key} className="bg-gray-50 p-4 rounded-lg">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  {month.label}
-                </label>
-                <input
-                  type="number"
-                  value={salesTargets[month.key] || ''}
-                  onChange={(e) => setSalesTargets({
-                    ...salesTargets,
-                    [month.key]: parseInt(e.target.value) || 0
-                  })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
-                  placeholder="0"
-                />
-              </div>
-            ))}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                開始月
+              </label>
+              <input
+                type="month"
+                value={formData.target_start_month}
+                onChange={(e) => setFormData({ ...formData, target_start_month: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                終了月
+              </label>
+              <input
+                type="month"
+                value={formData.target_end_month}
+                onChange={(e) => setFormData({ ...formData, target_end_month: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+              />
+            </div>
           </div>
         </div>
+
+        {/* 月別売上目標 */}
+        {getTargetMonths().length > 0 && (
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">月別売上目標</h2>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {getTargetMonths().map((month) => (
+                <div key={month.key} className="bg-gray-50 p-4 rounded-lg">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    {month.label}
+                  </label>
+                  <input
+                    type="number"
+                    value={salesTargets[month.key] || ''}
+                    onChange={(e) => setSalesTargets({
+                      ...salesTargets,
+                      [month.key]: parseInt(e.target.value) || 0
+                    })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    placeholder="0"
+                    min="0"
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
         
         {/* メンバー管理 */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">

@@ -32,6 +32,8 @@ export default function NewProjectPage() {
     description: '',
     status: 'active' as 'active' | 'inactive',
     color: '#667eea',
+    target_start_month: '',
+    target_end_month: '',
   })
   
   const [members, setMembers] = useState<string[]>([])
@@ -57,7 +59,11 @@ export default function NewProjectPage() {
     }
     
     try {
-      await createProject(formData)
+      // メンバー情報も含めて作成
+      await createProject({
+        ...formData,
+        members
+      })
       router.push('/projects')
     } catch (error) {
       console.error('プロジェクト作成エラー:', error)

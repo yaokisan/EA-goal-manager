@@ -19,9 +19,11 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import Button from './Button'
+import { useAuth } from '@/hooks/useAuth'
 
 export default function Navigation() {
   const pathname = usePathname()
+  const { user, signOut } = useAuth()
   
   const navItems = [
     { href: '/dashboard', label: 'ダッシュボード', icon: '📊' },
@@ -31,9 +33,12 @@ export default function Navigation() {
   
   const isActive = (href: string) => pathname.startsWith(href)
   
-  const handleLogout = () => {
-    // TODO: Supabase認証実装後に実装
-    console.log('ログアウト処理')
+  const handleLogout = async () => {
+    try {
+      await signOut()
+    } catch (error) {
+      console.error('ログアウトエラー:', error)
+    }
   }
   
   return (
@@ -68,7 +73,13 @@ export default function Navigation() {
               </Link>
             ))}
             
-            <div className="ml-2 md:ml-4">
+            {/* ユーザー情報とログアウト */}
+            <div className="flex items-center ml-2 md:ml-4 space-x-3">
+              {user && (
+                <div className="hidden md:block text-sm text-gray-600">
+                  {user.email}
+                </div>
+              )}
               <Button
                 variant="secondary"
                 size="sm"
