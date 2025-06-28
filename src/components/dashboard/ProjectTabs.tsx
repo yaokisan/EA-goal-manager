@@ -172,27 +172,6 @@ export default function ProjectTabs({
       )}
       
       {/* すべてタブの説明 */}
-      {activeTab === 'all' && (
-        <div className="p-4 bg-blue-50 border-b border-gray-200">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
-            {getNext3Months().map((month, index) => {
-              // 全プロジェクトの目標の合計を計算
-              const totalAmount = projects.reduce((total, project) => {
-                return total + getSalesTargetForMonth(project.id, month.yearMonth)
-              }, 0)
-              
-              return (
-                <div key={month.yearMonth}>
-                  <span className="text-gray-600">{month.label}：</span>
-                  <span className="font-semibold">
-                    {totalAmount > 0 ? `¥${totalAmount.toLocaleString()}` : '未設定'}
-                  </span>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      )}
     </div>
   )
 }

@@ -37,7 +37,6 @@ export default function ProjectEditPage() {
   
   const [formData, setFormData] = useState({
     name: '',
-    description: '',
     status: 'active' as 'active' | 'inactive',
     color: '#667eea',
     target_start_month: '',
@@ -52,7 +51,6 @@ export default function ProjectEditPage() {
     if (project) {
       setFormData({
         name: project.name,
-        description: project.description || '',
         status: project.status,
         color: project.color,
         target_start_month: project.target_start_month || '',
@@ -218,18 +216,6 @@ export default function ProjectEditPage() {
             </div>
           </div>
           
-          <div className="mt-6">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              プロジェクト概要
-            </label>
-            <textarea
-              value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              rows={4}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
-              placeholder="プロジェクトの概要を入力してください"
-            />
-          </div>
         </div>
         
         {/* 目標期間設定 */}
@@ -276,10 +262,10 @@ export default function ProjectEditPage() {
                   </label>
                   <input
                     type="number"
-                    value={salesTargets[month.key] || ''}
+                    value={salesTargets[month.key] !== undefined ? salesTargets[month.key] : ''}
                     onChange={(e) => setSalesTargets({
                       ...salesTargets,
-                      [month.key]: parseInt(e.target.value) || 0
+                      [month.key]: e.target.value === '' ? 0 : parseInt(e.target.value) || 0
                     })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
                     placeholder="0"

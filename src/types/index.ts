@@ -36,7 +36,7 @@ export interface Task {
   id: string
   name: string
   project_id: string
-  assignee: string | null
+  assignees: string[] // 複数担当者の配列に変更
   start_date: string
   end_date: string
   status: 'pending' | 'completed'

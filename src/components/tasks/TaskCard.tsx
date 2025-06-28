@@ -52,7 +52,7 @@ export default function TaskCard({
 }: TaskCardProps) {
   const [editData, setEditData] = useState({
     name: task.name,
-    assignee: task.assignee || '',
+    assignees: task.assignees || [],
     start_date: task.start_date,
     end_date: task.end_date,
   })
@@ -120,27 +120,49 @@ export default function TaskCard({
           {/* メタ情報編集 */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-sm">
             {availableMembers.length > 0 ? (
-              <select
-                value={editData.assignee}
-                onChange={(e) => setEditData({ ...editData, assignee: e.target.value })}
-                className="px-2 py-1 border border-gray-300 rounded text-sm"
-              >
-                <option value="">担当者を選択</option>
-                {availableMembers.map((member) => (
-                  <option key={member} value={member}>
-                    {member}
-                  </option>
-                ))}
-              </select>
+              <div className="space-y-1">
+                <div className="text-xs text-gray-600">担当者 (複数選択可)</div>
+                <div className="max-h-20 overflow-y-auto border border-gray-300 rounded p-1">
+                  {availableMembers.map((member) => (
+                    <label key={member} className="flex items-center space-x-1 text-xs">
+                      <input
+                        type="checkbox"
+                        checked={editData.assignees.includes(member)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setEditData({ 
+                              ...editData, 
+                              assignees: [...editData.assignees, member] 
+                            })
+                          } else {
+                            setEditData({ 
+                              ...editData, 
+                              assignees: editData.assignees.filter(a => a !== member) 
+                            })
+                          }
+                        }}
+                        className="w-3 h-3"
+                      />
+                      <span>{member}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
             ) : (
-              <input
-                type="text"
-                value={editData.assignee}
-                onChange={(e) => setEditData({ ...editData, assignee: e.target.value })}
-                onKeyDown={handleKeyDown}
-                className="px-2 py-1 border border-gray-300 rounded text-sm"
-                placeholder="担当者"
-              />
+              <div className="space-y-1">
+                <div className="text-xs text-gray-600">担当者 (カンマ区切り)</div>
+                <input
+                  type="text"
+                  value={editData.assignees.join(', ')}
+                  onChange={(e) => setEditData({ 
+                    ...editData, 
+                    assignees: e.target.value.split(',').map(a => a.trim()).filter(a => a) 
+                  })}
+                  onKeyDown={handleKeyDown}
+                  className="px-2 py-1 border border-gray-300 rounded text-sm w-full"
+                  placeholder="担当者 (複数の場合はカンマ区切り)"
+                />
+              </div>
             )}
             <input
               type="date"
@@ -205,9 +227,9 @@ export default function TaskCard({
             </span>
             
             {/* 担当者 */}
-            {task.assignee && (
+            {task.assignees && task.assignees.length > 0 && (
               <span className="text-gray-600">
-                👤 {task.assignee}
+                👤 {task.assignees.join(', ')}
               </span>
             )}
             

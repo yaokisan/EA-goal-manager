@@ -34,17 +34,31 @@ if (process.env.NODE_ENV === 'development') {
 }
 
 export default function DashboardPage() {
-  const [activeTab, setActiveTab] = useState('recent')
+  const [activeTab, setActiveTab] = useState('all')
   const [focusMode, setFocusMode] = useState(false)
   const { tasks, getRecentTasks } = useTasks()
   const { projects } = useProjects()
-  const { getTaskStats } = useFocusMode()
+
+  const getProjectIdForFilter = () => {
+    if (activeTab === 'recent' || activeTab === 'all') {
+      return undefined
+    }
+    return activeTab
+  }
+
+  const { getTaskStats } = useFocusMode(getProjectIdForFilter())
 
   // フォーカスモード状態をローカルストレージから復元
   useEffect(() => {
     const savedFocusMode = localStorage.getItem('focusMode')
     if (savedFocusMode !== null) {
       setFocusMode(JSON.parse(savedFocusMode))
+    }
+    
+    // アクティブタブの状態をローカルストレージから復元
+    const savedActiveTab = localStorage.getItem('activeTab')
+    if (savedActiveTab) {
+      setActiveTab(savedActiveTab)
     }
   }, [])
 
@@ -55,11 +69,10 @@ export default function DashboardPage() {
     localStorage.setItem('focusMode', JSON.stringify(newFocusMode))
   }
 
-  const getProjectIdForFilter = () => {
-    if (activeTab === 'recent' || activeTab === 'all') {
-      return undefined
-    }
-    return activeTab
+  // タブ変更時にローカルストレージに保存
+  const handleTabChange = (tabId: string) => {
+    setActiveTab(tabId)
+    localStorage.setItem('activeTab', tabId)
   }
 
   const getTaskListTitle = () => {
@@ -96,7 +109,7 @@ export default function DashboardPage() {
       {/* プロジェクトタブ */}
       <ProjectTabs
         activeTab={activeTab}
-        onTabChange={setActiveTab}
+        onTabChange={handleTabChange}
         focusMode={focusMode}
         onFocusModeToggle={handleFocusModeToggle}
       />

@@ -276,7 +276,7 @@ function NewTaskForm({ projectId, projects, availableMembers, onSave, onCancel, 
   const [formData, setFormData] = useState({
     name: '',
     project_id: projectId || (projects[0]?.id || ''),
-    assignee: '',
+    assignees: [] as string[],
     start_date: new Date().toISOString().split('T')[0],
     end_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 1週間後
     status: 'pending' as const,
@@ -328,27 +328,49 @@ function NewTaskForm({ projectId, projects, availableMembers, onSave, onCancel, 
             </select>
           )}
           {availableMembers.length > 0 ? (
-            <select
-              value={formData.assignee}
-              onChange={(e) => setFormData({ ...formData, assignee: e.target.value })}
-              className="px-2 py-1 border border-gray-300 rounded text-sm"
-            >
-              <option value="">担当者を選択</option>
-              {availableMembers.map((member) => (
-                <option key={member} value={member}>
-                  {member}
-                </option>
-              ))}
-            </select>
+            <div className="space-y-1">
+              <div className="text-xs text-gray-600">担当者 (複数選択可)</div>
+              <div className="max-h-20 overflow-y-auto border border-gray-300 rounded p-1">
+                {availableMembers.map((member) => (
+                  <label key={member} className="flex items-center space-x-1 text-xs">
+                    <input
+                      type="checkbox"
+                      checked={formData.assignees.includes(member)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setFormData({ 
+                            ...formData, 
+                            assignees: [...formData.assignees, member] 
+                          })
+                        } else {
+                          setFormData({ 
+                            ...formData, 
+                            assignees: formData.assignees.filter(a => a !== member) 
+                          })
+                        }
+                      }}
+                      className="w-3 h-3"
+                    />
+                    <span>{member}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
           ) : (
-            <input
-              type="text"
-              value={formData.assignee}
-              onChange={(e) => setFormData({ ...formData, assignee: e.target.value })}
-              onKeyDown={handleKeyDown}
-              className="px-2 py-1 border border-gray-300 rounded text-sm"
-              placeholder="担当者"
-            />
+            <div className="space-y-1">
+              <div className="text-xs text-gray-600">担当者 (カンマ区切り)</div>
+              <input
+                type="text"
+                value={formData.assignees.join(', ')}
+                onChange={(e) => setFormData({ 
+                  ...formData, 
+                  assignees: e.target.value.split(',').map(a => a.trim()).filter(a => a) 
+                })}
+                onKeyDown={handleKeyDown}
+                className="px-2 py-1 border border-gray-300 rounded text-sm w-full"
+                placeholder="担当者 (複数の場合はカンマ区切り)"
+              />
+            </div>
           )}
           <input
             type="date"

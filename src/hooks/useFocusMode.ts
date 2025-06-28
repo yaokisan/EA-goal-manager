@@ -43,7 +43,7 @@ const defaultFocusData: Omit<FocusData, 'id' | 'user_id'> = {
   updated_at: new Date().toISOString(),
 }
 
-export function useFocusMode() {
+export function useFocusMode(projectId?: string) {
   const [focusData, setFocusData] = useState<FocusData | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -86,13 +86,22 @@ export function useFocusMode() {
       console.log('認証済みユーザー - Supabaseからデータ取得中...')
       setLoading(true)
       
-      // まずは、アクティブなフォーカスモードを探す
-      let { data, error } = await supabase
+      // プロジェクト別のアクティブなフォーカスモードを探す
+      let query = supabase
         .from('focus_modes')
         .select('*')
         .eq('user_id', user.id)
         .eq('is_active', true)
-        .single()
+      
+      // プロジェクトIDが指定されている場合はフィルタリング
+      if (projectId) {
+        query = query.eq('project_id', projectId)
+      } else {
+        // 「すべて」タブの場合はproject_idがnullのものを取得
+        query = query.is('project_id', null)
+      }
+      
+      let { data, error } = await query.single()
 
       console.log('アクティブなフォーカスモード検索結果:', { data, error })
 
@@ -115,7 +124,7 @@ export function useFocusMode() {
           const newFocusData = {
             ...defaultFocusData,
             user_id: user.id,
-            project_id: null
+            project_id: projectId || null
           }
           console.log('新規作成データ:', newFocusData)
           
@@ -167,7 +176,7 @@ export function useFocusMode() {
     } finally {
       setLoading(false)
     }
-  }, [user, supabase])
+  }, [user, supabase, projectId])
 
   // 初期データ取得
   useEffect(() => {
@@ -234,7 +243,7 @@ export function useFocusMode() {
           ...defaultFocusData,
           ...updateData,
           user_id: user.id,
-          project_id: null
+          project_id: projectId || null
         }
         console.log('新規作成データ:', newFocusData)
         
