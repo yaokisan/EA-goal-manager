@@ -45,10 +45,10 @@ export default function FocusMode({ isVisible, onClose }: FocusModeProps) {
 
   const getUrgencyColor = () => {
     switch (urgencyLevel) {
-      case 'overdue': return 'from-red-600 to-red-800'
-      case 'critical': return 'from-red-500 to-red-700'
-      case 'urgent': return 'from-orange-500 to-red-600'
-      case 'warning': return 'from-yellow-500 to-orange-500'
+      case 'overdue': return 'from-gray-600 to-gray-800'
+      case 'critical': return 'from-gray-500 to-gray-700'
+      case 'urgent': return 'from-blue-600 to-indigo-700'
+      case 'warning': return 'from-blue-500 to-blue-700'
       default: return 'from-blue-500 to-purple-600'
     }
   }
@@ -168,44 +168,44 @@ export default function FocusMode({ isVisible, onClose }: FocusModeProps) {
   }
 
   return (
-    <div className={`bg-gradient-to-r ${getUrgencyColor()} rounded-lg p-6 text-white ${shouldAnimate ? 'animate-pulse' : ''}`}>
+    <div className={`bg-gradient-to-r ${getUrgencyColor()} rounded-lg p-4 text-white ${shouldAnimate ? 'animate-pulse' : ''}`}>
       <div className="flex items-start justify-between">
         <div className="flex-1">
-          <div className="flex items-center space-x-3 mb-3">
-            <span className="text-3xl">🎯</span>
+          <div className="flex items-center space-x-3 mb-2">
+            <span className="text-2xl">🎯</span>
             <div>
-              <div className="text-sm opacity-90">フォーカス期限</div>
-              <div className="font-bold text-lg">
+              <div className="text-xs opacity-90">フォーカス期限</div>
+              <div className="font-bold text-base">
                 {new Date(focusData.deadline).toLocaleDateString('ja-JP', {
                   year: 'numeric',
                   month: 'long',
                   day: 'numeric'
                 })}
               </div>
-              <div className="text-sm font-medium opacity-90">
+              <div className="text-xs font-medium opacity-90">
                 {getUrgencyText()}
               </div>
             </div>
           </div>
           
-          <h3 className="text-xl font-bold mb-2">{focusData.title}</h3>
-          <p className="text-white/90 text-base leading-relaxed">
+          <h3 className="text-lg font-bold mb-1">{focusData.title}</h3>
+          <p className="text-white/90 text-sm leading-relaxed line-clamp-2">
             {focusData.description}
           </p>
         </div>
         
-        <div className="flex flex-col space-y-2 ml-4">
+        <div className="flex flex-row space-x-2 ml-4">
           <button
             onClick={() => setIsEditing(true)}
             disabled={loading}
-            className="text-white/80 hover:text-white text-sm px-3 py-1 rounded border border-white/30 hover:border-white/50 transition-colors disabled:opacity-50"
+            className="text-white/80 hover:text-white text-xs px-2 py-1 rounded border border-white/30 hover:border-white/50 transition-colors disabled:opacity-50"
           >
             編集
           </button>
           {onClose && (
             <button
               onClick={onClose}
-              className="text-white/80 hover:text-white text-sm px-3 py-1 rounded border border-white/30 hover:border-white/50 transition-colors"
+              className="text-white/80 hover:text-white text-xs px-2 py-1 rounded border border-white/30 hover:border-white/50 transition-colors"
             >
               閉じる
             </button>
@@ -214,29 +214,29 @@ export default function FocusMode({ isVisible, onClose }: FocusModeProps) {
       </div>
       
       {/* 進捗インジケーター */}
-      <div className="mt-4 pt-4 border-t border-white/20">
-        <div className="flex items-center justify-between text-sm mb-2">
+      <div className="mt-3 pt-3 border-t border-white/20">
+        <div className="flex items-center justify-between text-xs mb-2">
           <span>進捗状況</span>
           <div className="flex items-center space-x-2">
             <span>{focusData.progress}%</span>
             {focusData.progress === 100 && <span>🎉</span>}
           </div>
         </div>
-        <div className="w-full bg-white/20 rounded-full h-2">
+        <div className="w-full bg-white/20 rounded-full h-1.5">
           <div
-            className="bg-white h-2 rounded-full transition-all duration-500"
+            className="bg-white h-1.5 rounded-full transition-all duration-500"
             style={{ width: `${focusData.progress}%` }}
           ></div>
         </div>
         
         {/* クイック進捗更新ボタン */}
-        <div className="flex justify-center space-x-2 mt-3">
+        <div className="flex justify-center space-x-1 mt-2">
           {[25, 50, 75, 100].map(progress => (
             <button
               key={progress}
               onClick={() => handleProgressChange(progress)}
               disabled={loading || focusData.progress === progress}
-              className={`text-xs px-2 py-1 rounded border border-white/30 transition-colors
+              className={`text-xs px-1.5 py-0.5 rounded border border-white/30 transition-colors
                 ${focusData.progress === progress 
                   ? 'bg-white/20 text-white' 
                   : 'text-white/80 hover:text-white hover:bg-white/10'

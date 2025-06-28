@@ -69,19 +69,21 @@ export default function ProjectTabs({
     <div className="bg-white rounded-lg shadow-sm border border-gray-200">
       {/* タブナビゲーション */}
       <div className="border-b border-gray-200">
-        <nav className="flex -mb-px">
-          {tabs.map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => onTabChange(tab.id)}
-              className={getTabStyle(tab)}
-            >
-              {tab.label}
-            </button>
-          ))}
+        <div className="flex flex-col sm:flex-row">
+          <nav className="flex -mb-px overflow-x-auto">
+            {tabs.map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => onTabChange(tab.id)}
+                className={`${getTabStyle(tab)} whitespace-nowrap flex-shrink-0`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </nav>
           
           {/* フォーカスモードトグル */}
-          <div className="ml-auto flex items-center px-4">
+          <div className="flex items-center justify-center sm:justify-end px-4 py-2 sm:py-0 border-t sm:border-t-0 border-gray-200 sm:border-none">
             <label className="flex items-center cursor-pointer">
               <span className="mr-2 text-sm text-gray-700">フォーカスモード</span>
               <input
@@ -96,23 +98,23 @@ export default function ProjectTabs({
               </div>
             </label>
           </div>
-        </nav>
+        </div>
       </div>
       
       {/* プロジェクトKPI表示 */}
       {selectedProject && (
         <div className="p-4 bg-gray-50 border-b border-gray-200">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="font-medium text-gray-900">{selectedProject.name}</h3>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-3">
+            <h3 className="font-medium text-gray-900 mb-2 sm:mb-0">{selectedProject.name}</h3>
             <div 
-              className="w-4 h-4 rounded-full"
+              className="w-4 h-4 rounded-full flex-shrink-0"
               style={{ backgroundColor: selectedProject.color }}
             ></div>
           </div>
           
           <p className="text-sm text-gray-600 mb-3">{selectedProject.description}</p>
           
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
             <div className="bg-white rounded p-3">
               <div className="text-gray-600">ステータス</div>
               <div className="font-semibold capitalize">{selectedProject.status}</div>
@@ -142,7 +144,7 @@ export default function ProjectTabs({
       {/* すべてタブの説明 */}
       {activeTab === 'all' && (
         <div className="p-4 bg-blue-50 border-b border-gray-200">
-          <div className="flex space-x-8 text-sm">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
             <div>
               <span className="text-gray-600">今月目標：</span>
               <span className="font-semibold">¥1,000,000</span>

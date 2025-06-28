@@ -86,13 +86,13 @@ export default function DashboardPage() {
       />
       
       {/* ガントチャートとタスクリスト */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="space-y-6">
         {/* ガントチャート */}
         <GanttChart
           tasks={getFilteredTasksForGantt()}
           projects={projects}
-          width={500}
-          height={300}
+          width={1200}
+          height={400}
         />
         
         {/* タスクリスト */}
