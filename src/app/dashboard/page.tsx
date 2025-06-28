@@ -16,9 +16,36 @@
  * - ガントチャートとタスクリストの並列表示
  */
 
+'use client'
+
+import { useState } from 'react'
 import TaskList from '@/components/tasks/TaskList'
+import ProjectTabs from '@/components/dashboard/ProjectTabs'
+import { useTasks } from '@/hooks/useTasks'
 
 export default function DashboardPage() {
+  const [activeTab, setActiveTab] = useState('recent')
+  const [focusMode, setFocusMode] = useState(false)
+  const { getRecentTasks } = useTasks()
+
+  const getProjectIdForFilter = () => {
+    if (activeTab === 'recent' || activeTab === 'all') {
+      return undefined
+    }
+    return activeTab
+  }
+
+  const getTaskListTitle = () => {
+    switch (activeTab) {
+      case 'recent':
+        return '直近1週間のタスク'
+      case 'all':
+        return 'すべてのタスク'
+      default:
+        return 'プロジェクトのタスク'
+    }
+  }
+
   return (
     <div className="space-y-6">
       {/* ページタイトル */}
@@ -29,69 +56,31 @@ export default function DashboardPage() {
         </p>
       </div>
       
-      {/* プロジェクトタブ（仮実装） */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-        <div className="border-b border-gray-200">
-          <nav className="flex -mb-px">
-            <button className="px-6 py-3 text-sm font-medium text-white bg-red-500 border-b-2 border-red-500">
-              📅 直近1週間
-            </button>
-            <button className="px-6 py-3 text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-gray-300 border-b-2 border-transparent">
-              すべて
-            </button>
-            <button className="px-6 py-3 text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-gray-300 border-b-2 border-transparent">
-              プロジェクトA
-            </button>
-            <button className="px-6 py-3 text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-gray-300 border-b-2 border-transparent">
-              プロジェクトB
-            </button>
-            <div className="ml-auto flex items-center px-4">
-              <label className="flex items-center cursor-pointer">
-                <span className="mr-2 text-sm text-gray-700">フォーカスモード</span>
-                <input type="checkbox" className="sr-only" />
-                <div className="relative">
-                  <div className="block bg-gray-300 w-10 h-6 rounded-full"></div>
-                  <div className="absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition"></div>
-                </div>
-              </label>
-            </div>
-          </nav>
-        </div>
-        
-        {/* プロジェクトKPI（仮実装） */}
-        <div className="p-4 bg-gray-50 border-b border-gray-200">
-          <div className="flex space-x-8 text-sm">
-            <div>
-              <span className="text-gray-600">今月目標：</span>
-              <span className="font-semibold">¥1,000,000</span>
-            </div>
-            <div>
-              <span className="text-gray-600">来月目標：</span>
-              <span className="font-semibold">¥1,200,000</span>
-            </div>
-            <div>
-              <span className="text-gray-600">再来月目標：</span>
-              <span className="font-semibold">¥1,500,000</span>
-            </div>
-          </div>
-        </div>
-      </div>
+      {/* プロジェクトタブ */}
+      <ProjectTabs
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        focusMode={focusMode}
+        onFocusModeToggle={() => setFocusMode(!focusMode)}
+      />
       
-      {/* フォーカスモード表示エリア（仮実装） */}
-      <div className="bg-gradient-primary rounded-lg p-6 text-white animate-pulse">
-        <div className="flex items-start justify-between">
-          <div>
-            <div className="flex items-center space-x-2 mb-2">
-              <span className="text-2xl">🎯</span>
-              <span className="font-semibold">フォーカス期限：2024年5月15日</span>
+      {/* フォーカスモード表示エリア */}
+      {focusMode && (
+        <div className="bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg p-6 text-white animate-pulse">
+          <div className="flex items-start justify-between">
+            <div>
+              <div className="flex items-center space-x-2 mb-2">
+                <span className="text-2xl">🎯</span>
+                <span className="font-semibold">フォーカス期限：2024年5月15日</span>
+              </div>
+              <p className="text-lg">新機能リリースまでにすべてのバグを修正する</p>
             </div>
-            <p className="text-lg">新機能リリースまでにすべてのバグを修正する</p>
+            <button className="text-white/80 hover:text-white">
+              編集
+            </button>
           </div>
-          <button className="text-white/80 hover:text-white">
-            編集
-          </button>
         </div>
-      </div>
+      )}
       
       {/* ガントチャートとタスクリスト */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -116,8 +105,56 @@ export default function DashboardPage() {
         </div>
         
         {/* タスクリスト */}
-        <TaskList />
+        <FilteredTaskList
+          activeTab={activeTab}
+          projectId={getProjectIdForFilter()}
+          title={getTaskListTitle()}
+        />
       </div>
     </div>
+  )
+}
+
+// フィルタリングされたタスクリストコンポーネント
+interface FilteredTaskListProps {
+  activeTab: string
+  projectId?: string
+  title: string
+}
+
+function FilteredTaskList({ activeTab, projectId, title }: FilteredTaskListProps) {
+  const { getRecentTasks } = useTasks()
+
+  if (activeTab === 'recent') {
+    const recentTasks = getRecentTasks()
+    return (
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">{title}</h2>
+        <div className="space-y-3">
+          {recentTasks.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              <p>直近1週間に期限が迫っているタスクはありません</p>
+            </div>
+          ) : (
+            recentTasks.map(task => (
+              <div key={task.id} className="border border-red-200 rounded-lg p-3 bg-red-50">
+                <div className="font-medium text-red-900">{task.name}</div>
+                <div className="text-sm text-red-700 mt-1">
+                  期限: {new Date(task.end_date).toLocaleDateString('ja-JP')}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <TaskList
+      projectId={projectId}
+      title={title}
+      showAddButton={true}
+    />
   )
 }
