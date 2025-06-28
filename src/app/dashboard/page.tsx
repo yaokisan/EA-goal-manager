@@ -26,12 +26,14 @@ import GanttChart from '@/components/gantt/GanttChart'
 import FocusMode from '@/components/focus/FocusMode'
 import { useTasks } from '@/hooks/useTasks'
 import { useProjects } from '@/hooks/useProjects'
+import { useFocusMode } from '@/hooks/useFocusMode'
 
 export default function DashboardPage() {
   const [activeTab, setActiveTab] = useState('recent')
   const [focusMode, setFocusMode] = useState(false)
   const { tasks, getRecentTasks } = useTasks()
   const { projects } = useProjects()
+  const { getTaskStats } = useFocusMode()
 
   const getProjectIdForFilter = () => {
     if (activeTab === 'recent' || activeTab === 'all') {
@@ -92,7 +94,9 @@ export default function DashboardPage() {
           tasks={getFilteredTasksForGantt()}
           projects={projects}
           width={1200}
-          height={400}
+          height={200}
+          activeTab={activeTab}
+          taskStats={getTaskStats(getFilteredTasksForGantt(), activeTab)}
         />
         
         {/* タスクリスト */}

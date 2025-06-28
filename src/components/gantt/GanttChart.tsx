@@ -27,6 +27,13 @@ interface GanttChartProps {
   projects: Project[]
   width?: number
   height?: number
+  activeTab?: string
+  taskStats?: {
+    total: number
+    completed: number
+    remaining: number
+    progress: number
+  }
 }
 
 interface GanttTask {
@@ -43,7 +50,9 @@ export default function GanttChart({
   tasks, 
   projects, 
   width = 1200, 
-  height = 400 
+  height = 400,
+  activeTab = 'all',
+  taskStats = { total: 0, completed: 0, remaining: 0, progress: 0 }
 }: GanttChartProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -106,15 +115,15 @@ export default function GanttChart({
     // 描画設定（モバイル対応）
     const isMobile = window.innerWidth < 768
     const margin = { 
-      top: isMobile ? 50 : 60, 
+      top: isMobile ? 40 : 50, 
       right: isMobile ? 20 : 40, 
-      bottom: isMobile ? 50 : 60, 
-      left: isMobile ? 160 : 240 
+      bottom: isMobile ? 30 : 40, 
+      left: isMobile ? 160 : 220 
     }
     const chartWidth = actualWidth - margin.left - margin.right
     const chartHeight = height - margin.top - margin.bottom
-    const taskHeight = isMobile ? 24 : 28
-    const taskSpacing = isMobile ? 8 : 12
+    const taskHeight = isMobile ? 20 : 24
+    const taskSpacing = isMobile ? 6 : 8
     const taskRowHeight = taskHeight + taskSpacing
 
     // 日付範囲計算
@@ -134,17 +143,25 @@ export default function GanttChart({
       return margin.left + (days / totalDays) * chartWidth
     }
 
-    // 背景クリア（ダークテーマ風）
-    ctx.fillStyle = '#f8fafc'
+    // 背景クリア（モダンテーマ）
+    ctx.fillStyle = '#ffffff'
     ctx.fillRect(0, 0, actualWidth, height)
 
     // ヘッダー背景
-    ctx.fillStyle = '#f1f5f9'
+    ctx.fillStyle = '#fafbfc'
     ctx.fillRect(0, 0, actualWidth, margin.top)
     
     // サイドバー背景
-    ctx.fillStyle = '#f8fafc'
+    ctx.fillStyle = '#fdfdfd'
     ctx.fillRect(0, margin.top, margin.left, chartHeight)
+    
+    // サイドバー境界線
+    ctx.strokeStyle = '#e1e5e9'
+    ctx.lineWidth = 1
+    ctx.beginPath()
+    ctx.moveTo(margin.left, 0)
+    ctx.lineTo(margin.left, height)
+    ctx.stroke()
 
     // グリッド線描画
     ctx.strokeStyle = '#e2e8f0'
@@ -223,87 +240,126 @@ export default function GanttChart({
       
       // タスク行背景（ホバー時）
       if (isHovered) {
-        ctx.fillStyle = '#f8fafc'
+        ctx.fillStyle = '#f7f9fc'
         ctx.fillRect(0, y - taskSpacing/2, actualWidth, taskRowHeight)
       }
       
       // タスク名とプロジェクトラベル
-      const labelX = margin.left - 20
+      const labelX = margin.left - 15
       
-      // プロジェクト色インジケーター
+      // プロジェクト色インジケーター（円形）
       ctx.fillStyle = task.color
-      ctx.fillRect(labelX - 15, y + taskHeight/2 - 2, 3, 4)
+      ctx.beginPath()
+      ctx.arc(labelX - 15, y + taskHeight/2, 3, 0, 2 * Math.PI)
+      ctx.fill()
       
       // タスク名
-      ctx.fillStyle = isSelected ? '#1e40af' : '#1f2937'
-      ctx.font = isSelected ? 'bold 13px sans-serif' : '13px sans-serif'
+      ctx.fillStyle = isSelected ? '#2563eb' : '#374151'
+      ctx.font = isSelected ? 'bold 12px Inter, system-ui, sans-serif' : '12px Inter, system-ui, sans-serif'
       ctx.textAlign = 'right'
-      ctx.fillText(task.name, labelX, y + taskHeight / 2 + 2)
+      ctx.fillText(task.name, labelX, y + taskHeight / 2 + 1)
       
       // プロジェクト名（小さく）
-      ctx.fillStyle = '#6b7280'
-      ctx.font = '10px sans-serif'
-      ctx.fillText(task.projectName, labelX, y + taskHeight / 2 - 10)
+      ctx.fillStyle = '#9ca3af'
+      ctx.font = '10px Inter, system-ui, sans-serif'
+      ctx.fillText(task.projectName, labelX, y + taskHeight / 2 - 8)
       
-      // タスクバー影
-      ctx.fillStyle = 'rgba(0,0,0,0.1)'
-      ctx.fillRect(startX + 1, y + 5, barWidth, taskHeight - 8)
+      // タスクバーのモダンスタイル
+      const cornerRadius = 4
+      const barY = y + taskSpacing/2 + 2
+      const barHeight = taskHeight - taskSpacing - 4
+      
+      // 角丸矩形を描画するヘルパー関数
+      function drawRoundedRect(x: number, y: number, width: number, height: number, radius: number) {
+        if (!ctx) return
+        ctx.beginPath()
+        ctx.moveTo(x + radius, y)
+        ctx.lineTo(x + width - radius, y)
+        ctx.quadraticCurveTo(x + width, y, x + width, y + radius)
+        ctx.lineTo(x + width, y + height - radius)
+        ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height)
+        ctx.lineTo(x + radius, y + height)
+        ctx.quadraticCurveTo(x, y + height, x, y + height - radius)
+        ctx.lineTo(x, y + radius)
+        ctx.quadraticCurveTo(x, y, x + radius, y)
+        ctx.closePath()
+      }
+      
+      // タスクバー影（ソフトシャドウ）
+      ctx.fillStyle = 'rgba(0,0,0,0.08)'
+      drawRoundedRect(startX + 1, barY + 1, barWidth, barHeight, cornerRadius)
+      ctx.fill()
       
       // タスクバー背景
-      ctx.fillStyle = '#ffffff'
-      ctx.fillRect(startX, y + 4, barWidth, taskHeight - 8)
+      ctx.fillStyle = '#f8fafc'
+      drawRoundedRect(startX, barY, barWidth, barHeight, cornerRadius)
+      ctx.fill()
       
       // タスクバー境界線
-      ctx.strokeStyle = '#e5e7eb'
+      ctx.strokeStyle = '#e2e8f0'
       ctx.lineWidth = 1
-      ctx.strokeRect(startX, y + 4, barWidth, taskHeight - 8)
+      drawRoundedRect(startX, barY, barWidth, barHeight, cornerRadius)
+      ctx.stroke()
       
-      // タスクバー（進捗）
+      // タスクバー（進捗）- モダンスタイル
       const progressWidth = (barWidth * task.progress) / 100
       
-      // グラデーション進捗バー
-      const gradient = ctx.createLinearGradient(startX, y + 4, startX, y + taskHeight - 4)
-      gradient.addColorStop(0, task.color)
-      gradient.addColorStop(1, adjustColor(task.color, -20))
+      if (progressWidth > 4) {
+        // グラデーション進捗バー
+        const gradient = ctx.createLinearGradient(startX, barY, startX, barY + barHeight)
+        gradient.addColorStop(0, task.color)
+        gradient.addColorStop(1, adjustColor(task.color, -15))
+        
+        ctx.fillStyle = gradient
+        drawRoundedRect(startX + 1, barY + 1, progressWidth - 2, barHeight - 2, cornerRadius - 1)
+        ctx.fill()
+      }
       
-      ctx.fillStyle = gradient
-      ctx.fillRect(startX, y + 4, progressWidth, taskHeight - 8)
-      
-      // 選択状態の境界線
+      // 選択状態の境界線（モダンスタイル）
       if (isSelected) {
-        ctx.strokeStyle = '#3b82f6'
+        ctx.strokeStyle = '#2563eb'
         ctx.lineWidth = 2
-        ctx.strokeRect(startX - 1, y + 3, barWidth + 2, taskHeight - 6)
+        drawRoundedRect(startX - 1, barY - 1, barWidth + 2, barHeight + 2, cornerRadius + 1)
+        ctx.stroke()
       }
       
       // ホバー効果
       if (isHovered && !isSelected) {
-        ctx.strokeStyle = '#94a3b8'
+        ctx.strokeStyle = '#64748b'
         ctx.lineWidth = 1
-        ctx.strokeRect(startX - 1, y + 3, barWidth + 2, taskHeight - 6)
+        drawRoundedRect(startX - 1, barY - 1, barWidth + 2, barHeight + 2, cornerRadius + 1)
+        ctx.stroke()
       }
       
-      // 進捗率テキスト
-      if (barWidth > 50) {
-        ctx.fillStyle = task.progress > 50 ? '#ffffff' : '#374151'
-        ctx.font = '10px sans-serif'
+      // 進捗率テキスト（モダンスタイル）
+      if (barWidth > 40) {
+        ctx.fillStyle = task.progress > 60 ? '#ffffff' : '#475569'
+        ctx.font = '11px Inter, system-ui, sans-serif'
         ctx.textAlign = 'center'
         ctx.fillText(
           `${task.progress}%`,
           startX + barWidth / 2,
-          y + taskHeight / 2 + 2
+          barY + barHeight / 2 + 3
         )
       }
       
-      // リサイズハンドル（選択時のみ）
+      // リサイズハンドル（選択時のみ）- モダンスタイル
       if (isSelected) {
+        const handleWidth = 4
+        const handleHeight = barHeight
+        
         // 開始ハンドル
-        ctx.fillStyle = '#3b82f6'
-        ctx.fillRect(startX - 3, y + 6, 6, taskHeight - 12)
+        ctx.fillStyle = '#2563eb'
+        ctx.fillRect(startX - 2, barY, handleWidth, handleHeight)
         
         // 終了ハンドル
-        ctx.fillStyle = '#3b82f6'
-        ctx.fillRect(startX + barWidth - 3, y + 6, 6, taskHeight - 12)
+        ctx.fillStyle = '#2563eb'
+        ctx.fillRect(startX + barWidth - 2, barY, handleWidth, handleHeight)
+        
+        // ハンドル上のグリップ表示
+        ctx.fillStyle = '#ffffff'
+        ctx.fillRect(startX - 1, barY + handleHeight/2 - 1, 2, 2)
+        ctx.fillRect(startX + barWidth - 1, barY + handleHeight/2 - 1, 2, 2)
       }
     })
 
@@ -344,18 +400,31 @@ export default function GanttChart({
     const x = event.clientX - rect.left
     const y = event.clientY - rect.top
 
-    const margin = { top: 60, left: 240 }
-    const taskRowHeight = 40
+    const isMobile = window.innerWidth < 768
+    const margin = { 
+      top: isMobile ? 40 : 50, 
+      left: isMobile ? 160 : 220 
+    }
+    const taskHeight = isMobile ? 20 : 24
+    const taskSpacing = isMobile ? 6 : 8
+    const taskRowHeight = taskHeight + taskSpacing
 
     // どのタスクバーをホバーしているか判定
-    const taskIndex = Math.floor((y - margin.top - 6) / taskRowHeight)
+    const taskIndex = Math.floor((y - margin.top - taskSpacing/2) / taskRowHeight)
     const task = ganttTasks[taskIndex]
 
-    if (task && taskIndex >= 0 && taskIndex < ganttTasks.length && 
-        y >= margin.top + taskIndex * taskRowHeight + 6 && 
-        y <= margin.top + taskIndex * taskRowHeight + 34) {
-      setHoveredTask(task.id)
-      canvas.style.cursor = 'pointer'
+    if (task && taskIndex >= 0 && taskIndex < ganttTasks.length) {
+      const taskY = margin.top + taskIndex * taskRowHeight + taskSpacing/2
+      const barY = taskY + taskSpacing/2 + 2
+      const barHeight = taskHeight - taskSpacing - 4
+      
+      if (y >= barY && y <= barY + barHeight) {
+        setHoveredTask(task.id)
+        canvas.style.cursor = 'pointer'
+      } else {
+        setHoveredTask(null)
+        canvas.style.cursor = 'default'
+      }
     } else {
       setHoveredTask(null)
       canvas.style.cursor = 'default'
@@ -373,15 +442,28 @@ export default function GanttChart({
     const rect = canvas.getBoundingClientRect()
     const y = event.clientY - rect.top
 
-    const margin = { top: 60 }
-    const taskRowHeight = 40
+    const isMobile = window.innerWidth < 768
+    const margin = { 
+      top: isMobile ? 40 : 50 
+    }
+    const taskHeight = isMobile ? 20 : 24
+    const taskSpacing = isMobile ? 6 : 8
+    const taskRowHeight = taskHeight + taskSpacing
 
     // クリックされたタスクを特定
-    const taskIndex = Math.floor((y - margin.top - 6) / taskRowHeight)
+    const taskIndex = Math.floor((y - margin.top - taskSpacing/2) / taskRowHeight)
     const task = ganttTasks[taskIndex]
 
     if (task && taskIndex >= 0 && taskIndex < ganttTasks.length) {
-      setSelectedTask(task.id === selectedTask ? null : task.id)
+      const taskY = margin.top + taskIndex * taskRowHeight + taskSpacing/2
+      const barY = taskY + taskSpacing/2 + 2
+      const barHeight = taskHeight - taskSpacing - 4
+      
+      if (y >= barY && y <= barY + barHeight) {
+        setSelectedTask(task.id === selectedTask ? null : task.id)
+      } else {
+        setSelectedTask(null)
+      }
     } else {
       setSelectedTask(null)
     }
@@ -393,15 +475,26 @@ export default function GanttChart({
         <h2 className="text-lg font-semibold text-gray-900">ガントチャート</h2>
         <div className="flex items-center space-x-4 text-sm">
           <div className="flex items-center space-x-1">
-            <span>📋</span>
-            <span className="font-medium">{ganttTasks.filter(t => t.progress < 100).length}/{ganttTasks.length}</span>
+            <span className="text-gray-500">📋</span>
+            <span className="font-medium text-gray-700">
+              {taskStats.remaining}/{taskStats.total}
+            </span>
+            <span className="text-xs text-gray-500">残り</span>
           </div>
           <div className="flex items-center space-x-1">
-            <span>📈</span>
-            <span className="font-medium text-green-600 bg-green-50 px-2 py-0.5 rounded">
-              {ganttTasks.length > 0 ? Math.round(ganttTasks.reduce((acc, task) => acc + task.progress, 0) / ganttTasks.length) : 0}%
+            <span className="text-gray-500">📈</span>
+            <span className="font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded">
+              {taskStats.progress}%
             </span>
           </div>
+          {taskStats.total > 0 && (
+            <div className="flex items-center space-x-1">
+              <span className="text-gray-500">✅</span>
+              <span className="font-medium text-green-600">
+                {taskStats.completed}完了
+              </span>
+            </div>
+          )}
           {selectedTask && (
             <div className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded">
               選択中: {ganttTasks.find(t => t.id === selectedTask)?.name}

@@ -24,7 +24,6 @@ export interface FocusData {
   title: string
   deadline: string
   description: string
-  progress: number
   created_at: string
   updated_at: string
 }
@@ -35,7 +34,6 @@ const defaultFocusData: FocusData = {
   title: '新機能リリースまでにすべてのバグを修正する',
   deadline: '2024-05-15',
   description: 'プロダクトの品質向上のため、既知のバグをすべて修正し、安定したリリースを実現する',
-  progress: 75,
   created_at: new Date().toISOString(),
   updated_at: new Date().toISOString(),
 }
@@ -88,18 +86,65 @@ export function useFocusMode() {
     return 'normal'
   }, [calculateDaysRemaining])
 
-  // 進捗更新
-  const updateProgress = useCallback(async (progress: number) => {
-    if (progress < 0 || progress > 100) {
-      throw new Error('進捗は0-100の範囲で指定してください')
+  // フォーカス期間内のタスク進捗を自動計算する関数
+  const calculateProgressFromTasks = useCallback((tasks: any[], projectId?: string) => {
+    if (!focusData.deadline) return 0
+    
+    const focusDeadline = new Date(focusData.deadline)
+    const now = new Date()
+    
+    // フォーカス期間内のタスクをフィルタリング
+    let relevantTasks = tasks.filter(task => {
+      const taskEnd = new Date(task.end_date)
+      return taskEnd <= focusDeadline
+    })
+    
+    // プロジェクト指定がある場合はさらにフィルタリング
+    if (projectId && projectId !== 'all' && projectId !== 'recent') {
+      relevantTasks = relevantTasks.filter(task => task.project_id === projectId)
     }
     
-    await updateFocusData({ progress })
-  }, [updateFocusData])
+    if (relevantTasks.length === 0) return 0
+    
+    const completedTasks = relevantTasks.filter(task => task.status === 'completed')
+    return Math.round((completedTasks.length / relevantTasks.length) * 100)
+  }, [focusData.deadline])
 
-  // フォーカス目標完了
+  // フォーカス期間内のタスク統計を取得
+  const getTaskStats = useCallback((tasks: any[], projectId?: string) => {
+    if (!focusData.deadline) return { total: 0, completed: 0, remaining: 0, progress: 0 }
+    
+    const focusDeadline = new Date(focusData.deadline)
+    
+    // フォーカス期間内のタスクをフィルタリング
+    let relevantTasks = tasks.filter(task => {
+      const taskEnd = new Date(task.end_date)
+      return taskEnd <= focusDeadline
+    })
+    
+    // プロジェクト指定がある場合はさらにフィルタリング
+    if (projectId && projectId !== 'all' && projectId !== 'recent') {
+      relevantTasks = relevantTasks.filter(task => task.project_id === projectId)
+    }
+    
+    const total = relevantTasks.length
+    const completed = relevantTasks.filter(task => task.status === 'completed').length
+    const remaining = total - completed
+    const progress = total > 0 ? Math.round((completed / total) * 100) : 0
+    
+    return { total, completed, remaining, progress }
+  }, [focusData.deadline])
+
+  // 進捗更新（手動設定は削除）
+  const updateProgress = useCallback(async (progress: number) => {
+    // 自動計算に変更したため、この関数は使用しない
+    console.warn('進捗は自動計算されます')
+  }, [])
+
+  // フォーカス目標完了（期限を今日に設定）
   const completeFocus = useCallback(async () => {
-    await updateFocusData({ progress: 100 })
+    const today = new Date().toISOString().split('T')[0]
+    await updateFocusData({ deadline: today })
   }, [updateFocusData])
 
   // フォーカス目標リセット
@@ -122,5 +167,7 @@ export function useFocusMode() {
     resetFocus,
     calculateDaysRemaining,
     getUrgencyLevel,
+    calculateProgressFromTasks,
+    getTaskStats,
   }
 }

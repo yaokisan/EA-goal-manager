@@ -34,12 +34,15 @@ export default function FocusMode({ isVisible, onClose }: FocusModeProps) {
     loading, 
     daysRemaining, 
     urgencyLevel, 
-    updateFocusData,
-    updateProgress 
+    updateFocusData
   } = useFocusMode()
   
   const [isEditing, setIsEditing] = useState(false)
-  const [editData, setEditData] = useState<Omit<FocusData, 'id' | 'created_at' | 'updated_at'>>(focusData)
+  const [editData, setEditData] = useState<Omit<FocusData, 'id' | 'created_at' | 'updated_at'>>({
+    title: focusData.title,
+    deadline: focusData.deadline,
+    description: focusData.description
+  })
 
   if (!isVisible) return null
 
@@ -75,18 +78,9 @@ export default function FocusMode({ isVisible, onClose }: FocusModeProps) {
     setEditData({
       title: focusData.title,
       deadline: focusData.deadline,
-      description: focusData.description,
-      progress: focusData.progress
+      description: focusData.description
     })
     setIsEditing(false)
-  }
-
-  const handleProgressChange = async (newProgress: number) => {
-    try {
-      await updateProgress(newProgress)
-    } catch (error) {
-      console.error('進捗の更新に失敗:', error)
-    }
   }
 
   if (isEditing) {
@@ -134,24 +128,6 @@ export default function FocusMode({ isVisible, onClose }: FocusModeProps) {
               />
             </div>
             
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                進捗率
-              </label>
-              <div className="flex items-center space-x-3">
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  value={editData.progress}
-                  onChange={(e) => setEditData({ ...editData, progress: parseInt(e.target.value) })}
-                  className="flex-1"
-                />
-                <span className="text-sm font-medium text-gray-700 w-12">
-                  {editData.progress}%
-                </span>
-              </div>
-            </div>
           </div>
           
           <div className="flex justify-end space-x-3 mt-6">
@@ -168,83 +144,37 @@ export default function FocusMode({ isVisible, onClose }: FocusModeProps) {
   }
 
   return (
-    <div className={`bg-gradient-to-r ${getUrgencyColor()} rounded-lg p-4 text-white ${shouldAnimate ? 'animate-pulse' : ''}`}>
-      <div className="flex items-start justify-between">
-        <div className="flex-1">
-          <div className="flex items-center space-x-3 mb-2">
-            <span className="text-2xl">🎯</span>
-            <div>
-              <div className="text-xs opacity-90">フォーカス期限</div>
-              <div className="font-bold text-base">
-                {new Date(focusData.deadline).toLocaleDateString('ja-JP', {
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric'
-                })}
-              </div>
-              <div className="text-xs font-medium opacity-90">
-                {getUrgencyText()}
-              </div>
-            </div>
+    <div className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center space-x-3">
+          <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+            <span className="text-blue-600 text-lg">🎯</span>
           </div>
-          
-          <h3 className="text-lg font-bold mb-1">{focusData.title}</h3>
-          <p className="text-white/90 text-sm leading-relaxed line-clamp-2">
-            {focusData.description}
-          </p>
+          <div>
+            <h3 className="text-base font-semibold text-gray-900">{focusData.title}</h3>
+            <p className="text-sm text-gray-600">
+              期限: {new Date(focusData.deadline).toLocaleDateString('ja-JP')} 
+              <span className="ml-2 text-blue-600 font-medium">{getUrgencyText()}</span>
+            </p>
+          </div>
         </div>
         
-        <div className="flex flex-row space-x-2 ml-4">
+        <div className="flex items-center space-x-2">
           <button
             onClick={() => setIsEditing(true)}
             disabled={loading}
-            className="text-white/80 hover:text-white text-xs px-2 py-1 rounded border border-white/30 hover:border-white/50 transition-colors disabled:opacity-50"
+            className="text-gray-500 hover:text-gray-700 text-sm px-3 py-1 rounded border border-gray-300 hover:border-gray-400 transition-colors disabled:opacity-50"
           >
             編集
           </button>
           {onClose && (
             <button
               onClick={onClose}
-              className="text-white/80 hover:text-white text-xs px-2 py-1 rounded border border-white/30 hover:border-white/50 transition-colors"
+              className="text-gray-500 hover:text-gray-700 text-sm px-3 py-1 rounded border border-gray-300 hover:border-gray-400 transition-colors"
             >
               閉じる
             </button>
           )}
-        </div>
-      </div>
-      
-      {/* 進捗インジケーター */}
-      <div className="mt-3 pt-3 border-t border-white/20">
-        <div className="flex items-center justify-between text-xs mb-2">
-          <span>進捗状況</span>
-          <div className="flex items-center space-x-2">
-            <span>{focusData.progress}%</span>
-            {focusData.progress === 100 && <span>🎉</span>}
-          </div>
-        </div>
-        <div className="w-full bg-white/20 rounded-full h-1.5">
-          <div
-            className="bg-white h-1.5 rounded-full transition-all duration-500"
-            style={{ width: `${focusData.progress}%` }}
-          ></div>
-        </div>
-        
-        {/* クイック進捗更新ボタン */}
-        <div className="flex justify-center space-x-1 mt-2">
-          {[25, 50, 75, 100].map(progress => (
-            <button
-              key={progress}
-              onClick={() => handleProgressChange(progress)}
-              disabled={loading || focusData.progress === progress}
-              className={`text-xs px-1.5 py-0.5 rounded border border-white/30 transition-colors
-                ${focusData.progress === progress 
-                  ? 'bg-white/20 text-white' 
-                  : 'text-white/80 hover:text-white hover:bg-white/10'
-                } disabled:opacity-50`}
-            >
-              {progress}%
-            </button>
-          ))}
         </div>
       </div>
     </div>
