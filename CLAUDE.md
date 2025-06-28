@@ -22,6 +22,14 @@ Goal Focus は、プロジェクト管理、ガントチャート可視化、フ
 - カスタムフックによるメモリ効率的な状態管理
 - Supabase subscriptionsによるリアルタイム更新
 
+## Supabaseプロジェクト情報
+
+**⚠️ 重要: 以下の情報で統一すること**
+
+- **プロジェクトURL**: `https://krsqullplxexjcuuhqfz.supabase.co`
+- **プロジェクトID**: `krsqullplxexjcuuhqfz`
+- **Google OAuth リダイレクトURL**: `https://krsqullplxexjcuuhqfz.supabase.co/auth/v1/callback`
+
 ## データベーススキーマ
 
 アプリケーションは4つの主要テーブルを使用:
@@ -193,3 +201,16 @@ types/              # TypeScript型定義
 - ユーザーへの回答は日本語で統一する
 - コード内のコメントは基本的に日本語を使用
 - エラーメッセージやUIテキストも日本語で記述
+
+## 環境変数設定
+
+**本番環境（Vercel）での必要な環境変数:**
+```bash
+NEXT_PUBLIC_SUPABASE_URL=https://krsqullplxexjcuuhqfz.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=[Supabaseダッシュボードから取得]
+```
+
+**Google OAuth設定:**
+- Client ID: Google Cloud Consoleから取得
+- Client Secret: Google Cloud Consoleから取得  
+- 承認済みリダイレクトURI: `https://krsqullplxexjcuuhqfz.supabase.co/auth/v1/callback`
