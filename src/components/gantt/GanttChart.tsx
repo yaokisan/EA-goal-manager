@@ -11,16 +11,17 @@
  * 
  * 実装要件:
  * - モダンなDIVベースレンダリング
- * - タスクバー表示（期間・進捗）
+ * - タスクバー表示（期間・ドラッグ可能）
  * - プロジェクト色分け
- * - レスポンシブ対応
- * - インタラクティブ機能（ホバー・クリック）
+ * - 期間選択機能
+ * - フォーカスモード対応
  */
 
 'use client'
 
 import { useMemo, useState } from 'react'
 import { Task, Project } from '@/types'
+import { useFocusMode } from '@/hooks/useFocusMode'
 
 interface GanttChartProps {
   tasks: Task[]
@@ -43,21 +44,19 @@ interface GanttTask {
   assignee: string | null
   startDate: Date
   endDate: Date
-  progress: number
   color: string
   projectName: string
   avatar: string
-  category: string
+  project: Project
 }
 
-// タスクカテゴリ別の色設定
-const TASK_CATEGORIES = {
-  'UI設計': { color: '#8B5CF6', label: 'デザイン' },
-  'データベース': { color: '#EC4899', label: 'デザイン' },
-  'API実装': { color: '#06B6D4', label: '開発' },
-  'テスト実装': { color: '#10B981', label: 'テスト' },
-  'default': { color: '#6B7280', label: '開発' }
-}
+// 期間選択のオプション
+const PERIOD_OPTIONS = [
+  { value: '1month', label: '1ヶ月', days: 30 },
+  { value: '2months', label: '2ヶ月', days: 60 },
+  { value: '3months', label: '3ヶ月', days: 90 },
+  { value: 'custom', label: 'カスタム', days: 0 }
+]
 
 // アバター生成関数
 const getAvatarColor = (name: string) => {
@@ -79,26 +78,14 @@ export default function GanttChart({
   taskStats = { total: 0, completed: 0, remaining: 0, progress: 0 }
 }: GanttChartProps) {
   const [selectedTask, setSelectedTask] = useState<string | null>(null)
+  const [selectedPeriod, setSelectedPeriod] = useState('2months')
+  const [draggedTask, setDraggedTask] = useState<string | null>(null)
+  const { focusData } = useFocusMode()
 
   // タスクデータをガントチャート用に変換
   const ganttTasks = useMemo((): GanttTask[] => {
     return tasks.map(task => {
       const project = projects.find(p => p.id === task.project_id)
-      
-      // タスク名からカテゴリを推定
-      const taskName = task.name.toLowerCase()
-      let category = 'default'
-      if (taskName.includes('ui') || taskName.includes('デザイン') || taskName.includes('設計書')) {
-        category = 'UI設計'
-      } else if (taskName.includes('データベース') || taskName.includes('db')) {
-        category = 'データベース'
-      } else if (taskName.includes('api') || taskName.includes('実装')) {
-        category = 'API実装'
-      } else if (taskName.includes('テスト')) {
-        category = 'テスト実装'
-      }
-      
-      const categoryInfo = TASK_CATEGORIES[category as keyof typeof TASK_CATEGORIES] || TASK_CATEGORIES.default
       
       return {
         id: task.id,
@@ -106,23 +93,45 @@ export default function GanttChart({
         assignee: task.assignee,
         startDate: new Date(task.start_date),
         endDate: new Date(task.end_date),
-        progress: task.status === 'completed' ? 100 : Math.floor(Math.random() * 70 + 20),
-        color: categoryInfo.color,
+        color: project?.color || '#6B7280',
         projectName: project?.name || 'Unknown',
         avatar: task.assignee || '未割当',
-        category: categoryInfo.label
+        project: project!
       }
     })
   }, [tasks, projects])
 
-  // 日付範囲計算
+  // 表示期間を決定
   const { minDate, maxDate, totalDays } = useMemo(() => {
+    const today = new Date()
+    
+    if (focusMode && focusData.deadline) {
+      // フォーカスモードの場合、期限までの期間を表示
+      const deadlineDate = new Date(focusData.deadline)
+      return {
+        minDate: new Date(today),
+        maxDate: deadlineDate,
+        totalDays: Math.ceil((deadlineDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+      }
+    }
+
+    // 通常モード：選択された期間
+    const selectedOption = PERIOD_OPTIONS.find(opt => opt.value === selectedPeriod)
+    if (selectedOption && selectedOption.days > 0) {
+      const endDate = new Date(today.getTime() + selectedOption.days * 24 * 60 * 60 * 1000)
+      return {
+        minDate: new Date(today),
+        maxDate: endDate,
+        totalDays: selectedOption.days
+      }
+    }
+
+    // カスタムまたはデフォルト：タスクの期間に基づく
     if (ganttTasks.length === 0) {
-      const today = new Date()
       return {
         minDate: today,
-        maxDate: new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000),
-        totalDays: 30
+        maxDate: new Date(today.getTime() + 60 * 24 * 60 * 60 * 1000),
+        totalDays: 60
       }
     }
     
@@ -141,7 +150,7 @@ export default function GanttChart({
       maxDate: max,
       totalDays: Math.max(days, 30)
     }
-  }, [ganttTasks])
+  }, [ganttTasks, selectedPeriod, focusMode, focusData])
 
   // 日付グリッドを生成
   const dateGrid = useMemo(() => {
@@ -184,8 +193,9 @@ export default function GanttChart({
   // 今日の位置を計算
   const todayPercent = dateToPercent(new Date())
 
-  // カテゴリ別の凡例
-  const categories = Array.from(new Set(ganttTasks.map(task => task.category)))
+  // プロジェクト別の凡例
+  const projectsInUse = Array.from(new Set(ganttTasks.map(task => task.project)))
+    .filter(project => project)
 
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
@@ -194,24 +204,46 @@ export default function GanttChart({
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-bold">プロジェクトタイムライン</h2>
           
-          {/* カテゴリ凡例 */}
-          <div className="flex items-center space-x-4">
-            {categories.map(category => {
-              const categoryTasks = ganttTasks.filter(t => t.category === category)
-              const categoryColor = categoryTasks[0]?.color || '#6B7280'
-              
-              return (
-                <div key={category} className="flex items-center space-x-2">
+          <div className="flex items-center space-x-6">
+            {/* 期間選択 */}
+            {!focusMode && (
+              <div className="flex items-center space-x-2">
+                <span className="text-sm font-medium">表示期間:</span>
+                <select
+                  value={selectedPeriod}
+                  onChange={(e) => setSelectedPeriod(e.target.value)}
+                  className="bg-white bg-opacity-20 text-white border border-white border-opacity-30 rounded px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-white focus:ring-opacity-50"
+                >
+                  {PERIOD_OPTIONS.map(option => (
+                    <option key={option.value} value={option.value} className="text-gray-900">
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* プロジェクト凡例 */}
+            <div className="flex items-center space-x-4">
+              {projectsInUse.map(project => (
+                <div key={project.id} className="flex items-center space-x-2">
                   <div 
                     className="w-3 h-3 rounded"
-                    style={{ backgroundColor: categoryColor }}
+                    style={{ backgroundColor: project.color }}
                   />
-                  <span className="text-sm font-medium">{category}</span>
+                  <span className="text-sm font-medium">{project.name}</span>
                 </div>
-              )
-            })}
+              ))}
+            </div>
           </div>
         </div>
+
+        {/* フォーカスモード表示 */}
+        {focusMode && (
+          <div className="mt-4 text-sm opacity-90">
+            フォーカスモード: 目標期限までの期間を表示中
+          </div>
+        )}
       </div>
 
       {/* メインコンテンツ */}
@@ -335,11 +367,12 @@ export default function GanttChart({
               const endPercent = dateToPercent(task.endDate)
               const width = endPercent - startPercent
               const isSelected = selectedTask === task.id
+              const isDragged = draggedTask === task.id
 
               return (
                 <div
                   key={task.id}
-                  className="absolute flex items-center"
+                  className="absolute flex items-center group"
                   style={{
                     top: `${index * 72 + 20}px`,
                     left: `${startPercent}%`,
@@ -349,21 +382,17 @@ export default function GanttChart({
                 >
                   {/* タスクバー本体 */}
                   <div 
-                    className={`relative h-full rounded-lg shadow-sm border-2 transition-all duration-200 ${
-                      isSelected ? 'border-gray-400 shadow-md' : 'border-transparent'
-                    }`}
+                    className={`relative h-full rounded-lg shadow-sm transition-all duration-200 cursor-grab ${
+                      isDragged ? 'cursor-grabbing scale-105' : ''
+                    } ${isSelected ? 'ring-2 ring-gray-400' : ''}`}
                     style={{ 
-                      backgroundColor: task.color,
+                      background: `linear-gradient(135deg, ${task.color} 0%, ${task.color}DD 50%, ${task.color}BB 100%)`,
                       width: '100%'
                     }}
                     onClick={() => setSelectedTask(task.id === selectedTask ? null : task.id)}
+                    onMouseDown={() => setDraggedTask(task.id)}
+                    onMouseUp={() => setDraggedTask(null)}
                   >
-                    {/* 進捗表示 */}
-                    <div 
-                      className="h-full bg-black bg-opacity-20 rounded-l-lg"
-                      style={{ width: `${task.progress}%` }}
-                    />
-                    
                     {/* タスク名 */}
                     {width > 10 && (
                       <div className="absolute inset-0 flex items-center px-3">
@@ -372,6 +401,35 @@ export default function GanttChart({
                         </span>
                       </div>
                     )}
+
+                    {/* ドラッグハンドル（選択時またはホバー時） */}
+                    {(isSelected || isDragged) && (
+                      <>
+                        {/* 左ハンドル */}
+                        <div 
+                          className="absolute left-0 top-1/2 transform -translate-y-1/2 w-3 h-4 bg-white rounded-sm shadow-md cursor-ew-resize opacity-90 hover:opacity-100"
+                          style={{ left: '-6px' }}
+                        />
+                        
+                        {/* 右ハンドル */}
+                        <div 
+                          className="absolute right-0 top-1/2 transform -translate-y-1/2 w-3 h-4 bg-white rounded-sm shadow-md cursor-ew-resize opacity-90 hover:opacity-100"
+                          style={{ right: '-6px' }}
+                        />
+                      </>
+                    )}
+
+                    {/* ホバー時のハンドル表示 */}
+                    <div className="group-hover:opacity-60 opacity-0 transition-opacity duration-200">
+                      <div 
+                        className="absolute left-0 top-1/2 transform -translate-y-1/2 w-3 h-4 bg-white rounded-sm shadow-md cursor-ew-resize"
+                        style={{ left: '-6px' }}
+                      />
+                      <div 
+                        className="absolute right-0 top-1/2 transform -translate-y-1/2 w-3 h-4 bg-white rounded-sm shadow-md cursor-ew-resize"
+                        style={{ right: '-6px' }}
+                      />
+                    </div>
                   </div>
                 </div>
               )
