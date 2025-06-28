@@ -16,6 +16,8 @@
  * - ガントチャートとタスクリストの並列表示
  */
 
+import TaskList from '@/components/tasks/TaskList'
+
 export default function DashboardPage() {
   return (
     <div className="space-y-6">
@@ -113,65 +115,8 @@ export default function DashboardPage() {
           </div>
         </div>
         
-        {/* タスクリスト（仮実装） */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-gray-900">タスクリスト</h2>
-            <div className="flex space-x-2">
-              <button className="text-sm text-gray-600 hover:text-gray-900">
-                複数選択
-              </button>
-              <button className="text-sm text-primary-600 hover:text-primary-700 font-medium">
-                + タスク追加
-              </button>
-            </div>
-          </div>
-          
-          {/* タスクカード例 */}
-          <div className="space-y-3">
-            <div className="border border-gray-200 rounded-lg p-3 hover:shadow-sm transition-shadow">
-              <div className="flex items-start">
-                <input type="checkbox" className="mt-1 mr-3" />
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-medium text-gray-900">ログイン機能実装</h3>
-                  <div className="mt-1 flex items-center space-x-3 text-sm text-gray-600">
-                    <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded">プロジェクトA</span>
-                    <span>📅 4/25〜4/30</span>
-                    <span>👤 山田太郎</span>
-                  </div>
-                </div>
-                <button className="ml-2 text-gray-400 hover:text-gray-600">
-                  📋
-                </button>
-              </div>
-            </div>
-            
-            <div className="border border-gray-200 rounded-lg p-3 hover:shadow-sm transition-shadow">
-              <div className="flex items-start">
-                <input type="checkbox" className="mt-1 mr-3" />
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-medium text-gray-900">データベース設計</h3>
-                  <div className="mt-1 flex items-center space-x-3 text-sm text-gray-600">
-                    <span className="bg-orange-100 text-orange-700 px-2 py-0.5 rounded">プロジェクトB</span>
-                    <span>📅 4/20〜4/27</span>
-                    <span>👤 鈴木花子</span>
-                  </div>
-                </div>
-                <button className="ml-2 text-gray-400 hover:text-gray-600">
-                  📋
-                </button>
-              </div>
-            </div>
-          </div>
-          
-          {/* Doneセクション */}
-          <div className="mt-6">
-            <button className="flex items-center space-x-2 text-sm text-gray-600 hover:text-gray-900">
-              <span className="transform rotate-90">▶</span>
-              <span>Done (3)</span>
-            </button>
-          </div>
-        </div>
+        {/* タスクリスト */}
+        <TaskList />
       </div>
     </div>
   )
