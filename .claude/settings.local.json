@@ -22,7 +22,9 @@
       "Bash(curl:*)",
       "Bash(npm run seed:*)",
       "Bash(supabase db:*)",
-      "Bash(node test-db-schema.js)"
+      "Bash(node test-db-schema.js)",
+      "Bash(rg:*)",
+      "mcp__puppeteer__puppeteer_fill"
     ],
     "deny": []
   }

@@ -1,19 +1,6 @@
 /**
- * ダッシュボードページコンポーネント
- * 
- * 設計参照: UI-requirements.md § 3 ダッシュボード機能
- * 技術仕様: technical-requirements.md § 4.1 ページ構成
- * 
- * 関連コンポーネント:
- * - ProjectTabs: プロジェクトタブ
- * - FocusMode: フォーカスモード
- * - GanttChart: ガントチャート
- * - TaskList: タスクリスト
- * 
- * 実装要件:
- * - プロジェクトタブ切り替え
- * - フォーカスモード表示/非表示
- * - ガントチャートとタスクリストの並列表示
+ * 開発用ダッシュボードページ（認証不要）
+ * フォーカスモードのデバッグ用
  */
 
 'use client'
@@ -28,12 +15,7 @@ import { useTasks } from '@/hooks/useTasks'
 import { useProjects } from '@/hooks/useProjects'
 import { useFocusMode } from '@/hooks/useFocusMode'
 
-// デバッグ機能の読み込み（開発環境のみ）
-if (process.env.NODE_ENV === 'development') {
-  import('@/lib/debug/supabaseTest')
-}
-
-export default function DashboardPage() {
+export default function DevDashboardPage() {
   const [activeTab, setActiveTab] = useState('recent')
   const [focusMode, setFocusMode] = useState(false)
   const { tasks, getRecentTasks } = useTasks()
@@ -84,12 +66,12 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-6">
       {/* ページタイトル */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">ダッシュボード</h1>
+      <div className="bg-yellow-100 border border-yellow-400 rounded-lg p-4">
+        <h1 className="text-2xl font-bold text-gray-900">開発用ダッシュボード</h1>
         <p className="mt-1 text-sm text-gray-600">
-          プロジェクトとタスクを管理
+          認証なしでフォーカスモードのテストが可能です（ローカルストレージ使用）
         </p>
       </div>
       

@@ -49,7 +49,7 @@ export default function Navigation() {
           <div className="flex items-center">
             <Link href="/dashboard" className="flex items-center space-x-2">
               <span className="text-2xl font-bold bg-gradient-primary bg-clip-text text-transparent">
-                Goal Focus
+                Focus Goal
               </span>
             </Link>
           </div>

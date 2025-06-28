@@ -19,7 +19,7 @@
 
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Button from '@/components/ui/Button'
 import { useFocusMode, FocusData } from '@/hooks/useFocusMode'
 
@@ -34,17 +34,40 @@ export default function FocusMode({ isVisible, onClose }: FocusModeProps) {
     loading, 
     daysRemaining, 
     urgencyLevel, 
-    updateFocusData
+    updateFocusData,
+    debugSupabase
   } = useFocusMode()
   
   const [isEditing, setIsEditing] = useState(false)
-  const [editData, setEditData] = useState<Omit<FocusData, 'id' | 'created_at' | 'updated_at'>>({
-    title: focusData.title,
-    deadline: focusData.deadline,
-    description: focusData.description
+  const [editData, setEditData] = useState<Partial<FocusData>>({
+    goal: '',
+    deadline: ''
   })
 
+  // focusDataが変更されたらeditDataを更新
+  useEffect(() => {
+    if (focusData) {
+      setEditData({
+        goal: focusData.goal || '',
+        deadline: focusData.deadline || ''
+      })
+    }
+  }, [focusData])
+
   if (!isVisible) return null
+  
+  if (loading && !focusData) {
+    return (
+      <div className="bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg p-6 text-white">
+        <div className="flex items-center justify-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
+          <span className="ml-3">フォーカスモードを読み込み中...</span>
+        </div>
+      </div>
+    )
+  }
+  
+  if (!focusData) return null
 
   const getUrgencyColor = () => {
     switch (urgencyLevel) {
@@ -67,18 +90,34 @@ export default function FocusMode({ isVisible, onClose }: FocusModeProps) {
 
   const handleSave = async () => {
     try {
-      await updateFocusData(editData)
+      console.log('=== フォーカスモード保存開始 ===')
+      console.log('保存データ:', editData)
+      
+      // データベース構造に合わせて、goal と deadline のみ送信
+      const saveData = {
+        goal: editData.goal,
+        deadline: editData.deadline
+      }
+      console.log('実際に送信するデータ:', saveData)
+      
+      await updateFocusData(saveData)
       setIsEditing(false)
+      
+      console.log('=== フォーカスモード保存完了 ===')
     } catch (error) {
       console.error('フォーカス目標の更新に失敗:', error)
     }
   }
 
+  // デバッグ用ボタンのハンドラー
+  const handleDebug = async () => {
+    await debugSupabase()
+  }
+
   const handleCancel = () => {
     setEditData({
-      title: focusData.title,
-      deadline: focusData.deadline,
-      description: focusData.description
+      goal: focusData?.goal || '',
+      deadline: focusData?.deadline || ''
     })
     setIsEditing(false)
   }
@@ -96,8 +135,8 @@ export default function FocusMode({ isVisible, onClose }: FocusModeProps) {
               </label>
               <input
                 type="text"
-                value={editData.title}
-                onChange={(e) => setEditData({ ...editData, title: e.target.value })}
+                value={editData.goal}
+                onChange={(e) => setEditData({ ...editData, goal: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="フォーカス目標を入力"
               />
@@ -115,28 +154,24 @@ export default function FocusMode({ isVisible, onClose }: FocusModeProps) {
               />
             </div>
             
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                説明
-              </label>
-              <textarea
-                value={editData.description}
-                onChange={(e) => setEditData({ ...editData, description: e.target.value })}
-                rows={3}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="目標の詳細説明"
-              />
-            </div>
             
           </div>
           
           <div className="flex justify-end space-x-3 mt-6">
-            <Button variant="secondary" onClick={handleCancel} disabled={loading}>
+            <button 
+              onClick={handleCancel} 
+              disabled={loading}
+              className="px-4 py-2 bg-gray-200 text-gray-800 hover:bg-gray-300 rounded-lg"
+            >
               キャンセル
-            </Button>
-            <Button variant="primary" onClick={handleSave} disabled={loading}>
+            </button>
+            <button 
+              onClick={handleSave} 
+              disabled={loading}
+              className="px-4 py-2 bg-blue-500 text-white hover:bg-blue-600 rounded-lg"
+            >
               {loading ? '保存中...' : '保存'}
-            </Button>
+            </button>
           </div>
         </div>
       </div>
@@ -151,9 +186,9 @@ export default function FocusMode({ isVisible, onClose }: FocusModeProps) {
             <span className="text-white text-xl">🎯</span>
           </div>
           <div>
-            <h3 className="text-lg font-semibold text-white">{focusData.title}</h3>
+            <h3 className="text-lg font-semibold text-white">{focusData?.goal}</h3>
             <p className="text-sm text-blue-100 mt-1">
-              期限: {new Date(focusData.deadline).toLocaleDateString('ja-JP')} 
+              期限: {focusData?.deadline ? new Date(focusData.deadline).toLocaleDateString('ja-JP') : '未設定'} 
               <span className="ml-2 text-white font-medium">({getUrgencyText()})</span>
             </p>
           </div>

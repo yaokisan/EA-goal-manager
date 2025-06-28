@@ -1,4 +1,4 @@
-# Goal Focus アプリケーション技術要件定義書
+# Focus Goal アプリケーション技術要件定義書
 
 ## 1. システム概要
 
@@ -350,7 +350,7 @@ jobs:
 ## 11. ファイル構成（Next.js App Router）
 
 ```
-goal-focus/
+focus-goal/
 ├── app/
 │   ├── globals.css
 │   ├── layout.tsx

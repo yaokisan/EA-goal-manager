@@ -104,51 +104,71 @@ export default function GanttChart({
   // 表示期間を決定
   const { minDate, maxDate, totalDays } = useMemo(() => {
     const today = new Date()
+    today.setHours(0, 0, 0, 0)
     
-    if (focusMode && focusData.deadline) {
-      // フォーカスモードの場合、期限までの期間を表示
+    if (focusMode && focusData?.deadline) {
+      // フォーカスモードの場合、今日から期限までの期間を表示
       const deadlineDate = new Date(focusData.deadline)
+      deadlineDate.setHours(0, 0, 0, 0)
+      
+      // 1ヶ月前まで遡れるように開始日を調整
+      const oneMonthBefore = new Date(today)
+      oneMonthBefore.setMonth(oneMonthBefore.getMonth() - 1)
+      
       return {
-        minDate: new Date(today),
+        minDate: oneMonthBefore,
         maxDate: deadlineDate,
-        totalDays: Math.ceil((deadlineDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+        totalDays: Math.ceil((deadlineDate.getTime() - oneMonthBefore.getTime()) / (1000 * 60 * 60 * 24))
       }
     }
 
     // 通常モード：選択された期間
     const selectedOption = PERIOD_OPTIONS.find(opt => opt.value === selectedPeriod)
     if (selectedOption && selectedOption.days > 0) {
+      // 1ヶ月前から選択期間後まで
+      const oneMonthBefore = new Date(today)
+      oneMonthBefore.setMonth(oneMonthBefore.getMonth() - 1)
+      
       const endDate = new Date(today.getTime() + selectedOption.days * 24 * 60 * 60 * 1000)
+      
       return {
-        minDate: new Date(today),
+        minDate: oneMonthBefore,
         maxDate: endDate,
-        totalDays: selectedOption.days
+        totalDays: Math.ceil((endDate.getTime() - oneMonthBefore.getTime()) / (1000 * 60 * 60 * 24))
       }
     }
 
-    // カスタムまたはデフォルト：タスクの期間に基づく
+    // カスタムモード：タスクの期間に基づく（1ヶ月前〜タスク終了後まで）
     if (ganttTasks.length === 0) {
+      const oneMonthBefore = new Date(today)
+      oneMonthBefore.setMonth(oneMonthBefore.getMonth() - 1)
+      const twoMonthsAfter = new Date(today)
+      twoMonthsAfter.setMonth(twoMonthsAfter.getMonth() + 2)
+      
       return {
-        minDate: today,
-        maxDate: new Date(today.getTime() + 60 * 24 * 60 * 60 * 1000),
-        totalDays: 60
+        minDate: oneMonthBefore,
+        maxDate: twoMonthsAfter,
+        totalDays: Math.ceil((twoMonthsAfter.getTime() - oneMonthBefore.getTime()) / (1000 * 60 * 60 * 24))
       }
     }
     
     const allDates = ganttTasks.flatMap(task => [task.startDate, task.endDate])
-    const min = new Date(Math.min(...allDates.map(d => d.getTime())))
-    const max = new Date(Math.max(...allDates.map(d => d.getTime())))
+    const taskMinDate = new Date(Math.min(...allDates.map(d => d.getTime())))
+    const taskMaxDate = new Date(Math.max(...allDates.map(d => d.getTime())))
     
-    // 少し余裕を持たせる
-    min.setDate(min.getDate() - 2)
-    max.setDate(max.getDate() + 2)
+    // 1ヶ月前から、タスクまたは今日の2ヶ月後まで
+    const oneMonthBefore = new Date(today)
+    oneMonthBefore.setMonth(oneMonthBefore.getMonth() - 1)
     
-    const days = Math.ceil((max.getTime() - min.getTime()) / (1000 * 60 * 60 * 24))
+    const finalMinDate = new Date(Math.min(oneMonthBefore.getTime(), taskMinDate.getTime() - 7 * 24 * 60 * 60 * 1000))
+    const finalMaxDate = new Date(Math.max(taskMaxDate.getTime() + 7 * 24 * 60 * 60 * 1000, today.getTime() + 60 * 24 * 60 * 60 * 1000))
+    
+    const days = Math.ceil((finalMaxDate.getTime() - finalMinDate.getTime()) / (1000 * 60 * 60 * 24))
     
     return {
-      minDate: min,
-      maxDate: max,
-      totalDays: Math.max(days, 30)
+      minDate: finalMinDate,
+      maxDate: finalMaxDate,
+      totalDays: Math.max(days, 90)
     }
   }, [ganttTasks, selectedPeriod, focusMode, focusData])
 
@@ -250,25 +270,33 @@ export default function GanttChart({
       <div className="flex">
         {/* 左側: タスクリスト */}
         <div className="w-80 bg-gray-50 border-r border-gray-200">
-          {/* タスクヘッダー */}
-          <div className="p-4 bg-gray-100 border-b border-gray-200">
-            <h3 className="font-semibold text-gray-900">タスク</h3>
+          {/* タスクヘッダー - 右側のヘッダー高さに合わせる */}
+          <div className="bg-gray-100 border-b border-gray-200">
+            <div className="p-3 text-center">
+              <h3 className="font-semibold text-gray-900">タスク</h3>
+            </div>
+            <div className="flex border-t border-gray-200">
+              <div className="flex-1 text-center py-2">
+                <div className="text-xs text-gray-600">担当者</div>
+              </div>
+            </div>
           </div>
           
           {/* タスク一覧 */}
           <div className="divide-y divide-gray-200">
-            {ganttTasks.map((task) => (
+            {ganttTasks.map((task, index) => (
               <div 
                 key={task.id}
-                className={`p-4 hover:bg-white transition-colors cursor-pointer ${
+                className={`hover:bg-white transition-colors cursor-pointer ${
                   selectedTask === task.id ? 'bg-blue-50 border-r-4 border-blue-500' : ''
                 }`}
+                style={{ height: '48px' }} // 進捗バーの高さ24px + 余白24px
                 onClick={() => setSelectedTask(task.id === selectedTask ? null : task.id)}
               >
-                <div className="flex items-center space-x-3">
+                <div className="flex items-center space-x-3 h-full px-4">
                   {/* アバター */}
                   <div 
-                    className="w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold"
+                    className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
                     style={{ backgroundColor: getAvatarColor(task.avatar) }}
                   >
                     {getAvatarInitials(task.avatar)}
@@ -276,8 +304,8 @@ export default function GanttChart({
                   
                   {/* タスク情報 */}
                   <div className="flex-1 min-w-0">
-                    <h4 className="font-medium text-gray-900 truncate">{task.name}</h4>
-                    <p className="text-sm text-gray-500">
+                    <h4 className="font-medium text-gray-900 truncate text-sm">{task.name}</h4>
+                    <p className="text-xs text-gray-500">
                       {task.assignee || '未割当'} • {Math.ceil((task.endDate.getTime() - task.startDate.getTime()) / (1000 * 60 * 60 * 24))}日間
                     </p>
                   </div>
@@ -327,7 +355,7 @@ export default function GanttChart({
           </div>
 
           {/* タスクバー */}
-          <div className="relative" style={{ minWidth: '800px', minHeight: `${ganttTasks.length * 72}px` }}>
+          <div className="relative" style={{ minWidth: '800px', minHeight: `${ganttTasks.length * 48}px` }}>
             {/* 今日の線 */}
             {todayPercent >= 0 && todayPercent <= 100 && (
               <div 
@@ -374,10 +402,10 @@ export default function GanttChart({
                   key={task.id}
                   className="absolute flex items-center group"
                   style={{
-                    top: `${index * 72 + 20}px`,
+                    top: `${index * 48 + 12}px`, // タスクの中央に配置 (48px高さの中央は24px、バー高さ24pxなので12pxオフセット)
                     left: `${startPercent}%`,
                     width: `${Math.max(width, 5)}%`,
-                    height: '32px'
+                    height: '24px' // 進捗バーの高さを少し小さく
                   }}
                 >
                   {/* タスクバー本体 */}
@@ -440,7 +468,7 @@ export default function GanttChart({
               <div
                 key={index}
                 className="absolute left-0 right-0 border-b border-gray-100"
-                style={{ top: `${(index + 1) * 72}px` }}
+                style={{ top: `${(index + 1) * 48}px` }}
               />
             ))}
           </div>

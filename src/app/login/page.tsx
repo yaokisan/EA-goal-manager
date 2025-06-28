@@ -50,7 +50,7 @@ export default function LoginPage() {
           <div className="w-16 h-16 bg-gradient-to-br from-purple-600 to-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
             <span className="text-white text-2xl font-bold">🎯</span>
           </div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Goal Focus</h1>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Focus Goal</h1>
           <p className="text-gray-600">プロジェクト・タスク管理アプリ</p>
         </div>
 

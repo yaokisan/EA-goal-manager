@@ -22,7 +22,7 @@ import { AuthProvider } from '@/providers/AuthProvider'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'Goal Focus - タスク管理アプリケーション',
+  title: 'Focus Goal - タスク管理アプリケーション',
   description: 'プロジェクト別タスク管理、ガントチャート、フォーカスモード機能を備えたタスク管理アプリケーション',
 }
 
