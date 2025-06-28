@@ -23,6 +23,7 @@ import TaskList from '@/components/tasks/TaskList'
 import TaskCard from '@/components/tasks/TaskCard'
 import ProjectTabs from '@/components/dashboard/ProjectTabs'
 import GanttChart from '@/components/gantt/GanttChart'
+import FocusMode from '@/components/focus/FocusMode'
 import { useTasks } from '@/hooks/useTasks'
 import { useProjects } from '@/hooks/useProjects'
 
@@ -79,22 +80,10 @@ export default function DashboardPage() {
       />
       
       {/* フォーカスモード表示エリア */}
-      {focusMode && (
-        <div className="bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg p-6 text-white animate-pulse">
-          <div className="flex items-start justify-between">
-            <div>
-              <div className="flex items-center space-x-2 mb-2">
-                <span className="text-2xl">🎯</span>
-                <span className="font-semibold">フォーカス期限：2024年5月15日</span>
-              </div>
-              <p className="text-lg">新機能リリースまでにすべてのバグを修正する</p>
-            </div>
-            <button className="text-white/80 hover:text-white">
-              編集
-            </button>
-          </div>
-        </div>
-      )}
+      <FocusMode 
+        isVisible={focusMode}
+        onClose={() => setFocusMode(false)}
+      />
       
       {/* ガントチャートとタスクリスト */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
