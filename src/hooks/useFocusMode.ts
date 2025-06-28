@@ -183,7 +183,7 @@ export function useFocusMode(projectId?: string) {
     console.log('=== useFocusMode useEffect triggered ===')
     console.log('user dependency changed:', user?.id)
     fetchFocusData()
-  }, [fetchFocusData])
+  }, [fetchFocusData, user?.id])
 
   // focusDataの変更を監視
   useEffect(() => {
@@ -406,7 +406,7 @@ export function useFocusMode(projectId?: string) {
       console.error('フォーカス目標リセットエラー:', err)
       setError('フォーカス目標のリセットに失敗しました')
     }
-  }, [user, focusData, supabase, fetchFocusData])
+  }, [user, focusData, supabase, fetchFocusData, projectId])
 
   const daysRemaining = focusData ? calculateDaysRemaining(focusData.deadline) : 0
   const urgencyLevel = focusData ? getUrgencyLevel(focusData.deadline) : 'normal'

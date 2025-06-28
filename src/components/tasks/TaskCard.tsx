@@ -99,7 +99,7 @@ export default function TaskCard({
         document.removeEventListener('mousedown', handleClickOutside)
       }
     }
-  }, [isEditing, editData])
+  }, [isEditing, handleSave])
 
   const formatDateRange = (startDate: string, endDate: string) => {
     const start = new Date(startDate).toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric' })

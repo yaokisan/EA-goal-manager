@@ -41,7 +41,7 @@ interface GanttChartProps {
 interface GanttTask {
   id: string
   name: string
-  assignee: string | null
+  assignees: string[]
   startDate: Date
   endDate: Date
   color: string
@@ -90,12 +90,12 @@ export default function GanttChart({
       return {
         id: task.id,
         name: task.name,
-        assignee: task.assignee,
+        assignees: task.assignees || [],
         startDate: new Date(task.start_date),
         endDate: new Date(task.end_date),
         color: project?.color || '#6B7280',
         projectName: project?.name || 'Unknown',
-        avatar: task.assignee || '未割当',
+        avatar: task.assignees && task.assignees.length > 0 ? task.assignees[0] : '未割当',
         project: project!
       }
     })
@@ -318,7 +318,7 @@ export default function GanttChart({
                   <div className="flex-1 min-w-0">
                     <h4 className="font-medium text-gray-900 truncate text-sm">{task.name}</h4>
                     <p className="text-xs text-gray-500">
-                      {task.assignee || '未割当'} • {Math.ceil((task.endDate.getTime() - task.startDate.getTime()) / (1000 * 60 * 60 * 24))}日間
+                      {task.assignees && task.assignees.length > 0 ? task.assignees.join(', ') : '未割当'} • {Math.ceil((task.endDate.getTime() - task.startDate.getTime()) / (1000 * 60 * 60 * 24))}日間
                     </p>
                   </div>
                 </div>
