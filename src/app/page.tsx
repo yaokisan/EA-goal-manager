@@ -14,7 +14,25 @@
  * - レスポンシブ対応
  */
 
+'use client'
+
+import { useRouter } from 'next/navigation'
+import Button from '@/components/ui/Button'
+
 export default function HomePage() {
+  const router = useRouter()
+  
+  const handleDemoLogin = () => {
+    // TODO: Supabase認証実装後、実際の認証処理に置き換える
+    // 現在は開発用に直接ダッシュボードへ遷移
+    router.push('/dashboard')
+  }
+  
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    handleDemoLogin()
+  }
+  
   return (
     <div className="min-h-screen bg-gradient-primary flex items-center justify-center p-4">
       <div className="bg-white rounded-lg shadow-xl p-8 w-full max-w-md">
@@ -23,7 +41,7 @@ export default function HomePage() {
           <p className="text-gray-600">タスク管理アプリケーション</p>
         </div>
         
-        <form className="space-y-6">
+        <form className="space-y-6" onSubmit={handleSubmit}>
           <div>
             <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
               メールアドレス
@@ -33,6 +51,7 @@ export default function HomePage() {
               id="email"
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
               placeholder="your@example.com"
+              defaultValue="demo@example.com"
             />
           </div>
           
@@ -45,6 +64,7 @@ export default function HomePage() {
               id="password"
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
               placeholder="••••••••"
+              defaultValue="password"
             />
           </div>
           
@@ -56,9 +76,26 @@ export default function HomePage() {
           </button>
         </form>
         
-        <div className="mt-6 text-center">
-          <p className="text-sm text-gray-600">
-            デモ用アカウントでログイン可能
+        <div className="mt-6 space-y-4">
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-gray-300"></div>
+            </div>
+            <div className="relative flex justify-center text-sm">
+              <span className="px-2 bg-white text-gray-500">または</span>
+            </div>
+          </div>
+          
+          <Button
+            variant="secondary"
+            className="w-full"
+            onClick={handleDemoLogin}
+          >
+            デモアカウントでログイン
+          </Button>
+          
+          <p className="text-xs text-center text-gray-500">
+            ※ 認証機能は実装中です。デモボタンでダッシュボードに進めます。
           </p>
         </div>
       </div>
