@@ -17,7 +17,7 @@
 
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { Task, Project } from '@/types'
 import Tag from '@/components/ui/Tag'
 
@@ -58,11 +58,11 @@ export default function TaskCard({
     end_date: task.end_date,
   })
 
-  const handleSave = () => {
+  const handleSave = useCallback(() => {
     if (onSave && editData.name.trim()) {
       onSave(editData)
     }
-  }
+  }, [onSave, editData])
 
   const [enterPressCount, setEnterPressCount] = useState(0)
 
