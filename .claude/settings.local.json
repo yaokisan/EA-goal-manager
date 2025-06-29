@@ -24,7 +24,8 @@
       "Bash(supabase db:*)",
       "Bash(node test-db-schema.js)",
       "Bash(rg:*)",
-      "mcp__puppeteer__puppeteer_fill"
+      "mcp__puppeteer__puppeteer_fill",
+      "Bash(true)"
     ],
     "deny": []
   }

@@ -17,7 +17,7 @@
 
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useMemo } from 'react'
 import { Task } from '@/types'
 import { createClient } from '@/lib/supabase/client'
 import { useAuth } from '@/hooks/useAuth'
@@ -39,7 +39,10 @@ export function useTasks(projectId?: string) {
         .from('tasks')
         .select('*')
         .eq('user_id', user.id)
+        .order('order_index', { ascending: true, nullsFirst: false })
         .order('created_at', { ascending: false })
+      
+      console.log('📥 Fetched tasks from DB:', data?.map(t => ({ id: t.id, name: t.name, order_index: t.order_index })))
 
       if (error) throw error
       
@@ -60,15 +63,99 @@ export function useTasks(projectId?: string) {
 
   // 初期データ読み込み
   useEffect(() => {
+    console.log('🔄 useEffect triggered - fetching tasks. User:', user?.id)
     if (user) {
       fetchTasks()
     }
-  }, [user, fetchTasks])
+  }, [user]) // fetchTasksを依存配列から削除して無限ループを防ぐ
 
-  // プロジェクトでフィルタリングしたタスク
-  const tasks = projectId 
-    ? allTasks.filter(task => task.project_id === projectId)
-    : allTasks
+  // プロジェクトでフィルタリングしたタスク（order_indexでソート）
+  const tasks = useMemo(() => {
+    const filtered = projectId 
+      ? allTasks.filter(task => task.project_id === projectId)
+      : allTasks
+    
+    // order_indexでソート（nullの場合は末尾に）
+    return filtered.sort((a, b) => {
+      if (a.order_index === null && b.order_index === null) {
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      }
+      if (a.order_index === null) return 1
+      if (b.order_index === null) return -1
+      return a.order_index - b.order_index
+    })
+  }, [allTasks, projectId])
+
+  // タスクの並び順更新
+  const updateTaskOrder = useCallback(async (taskId: string, newIndex: number) => {
+    if (!user) throw new Error('認証が必要です')
+    
+    try {
+      const { error } = await supabase
+        .from('tasks')
+        .update({ order_index: newIndex })
+        .eq('id', taskId)
+        .eq('user_id', user.id)
+
+      if (error) throw error
+      
+      // ローカル状態も更新
+      setAllTasks(prev => prev.map(task => 
+        task.id === taskId ? { ...task, order_index: newIndex } : task
+      ))
+    } catch (err) {
+      console.error('タスク順序更新エラー:', err)
+      throw err
+    }
+  }, [supabase, user])
+
+  // 複数タスクの並び順を一括更新
+  const updateMultipleTaskOrder = useCallback(async (updates: { id: string; order_index: number }[]) => {
+    if (!user) throw new Error('認証が必要です')
+    
+    console.log('🔄 updateMultipleTaskOrder called with:', updates)
+    
+    try {
+      // バッチ更新を実行
+      const promises = updates.map(({ id, order_index }) => {
+        console.log(`📤 Updating task ${id} to order_index ${order_index}`)
+        return supabase
+          .from('tasks')
+          .update({ order_index })
+          .eq('id', id)
+          .eq('user_id', user.id)
+          .select() // 更新されたデータを返す
+      })
+      
+      const results = await Promise.all(promises)
+      console.log('📋 Update results:', results.map(r => ({ 
+        data: r.data?.map(task => ({ id: task.id, name: task.name, order_index: task.order_index })), 
+        error: r.error 
+      })))
+      
+      const errors = results.filter(result => result.error).map(result => result.error)
+      
+      if (errors.length > 0) {
+        console.error('❌ Batch update errors:', errors)
+        throw new Error(`一部のタスク更新に失敗: ${errors.length}件`)
+      }
+      
+      console.log('✅ Batch update successful')
+      
+      // ローカル状態を更新
+      setAllTasks(prev => {
+        const updated = prev.map(task => {
+          const update = updates.find(u => u.id === task.id)
+          return update ? { ...task, order_index: update.order_index } : task
+        })
+        console.log('📝 Local state updated:', updated.map(t => ({ id: t.id, name: t.name, order_index: t.order_index })))
+        return updated
+      })
+    } catch (err) {
+      console.error('複数タスク順序更新エラー:', err)
+      throw err
+    }
+  }, [supabase, user])
 
   // タスク作成
   const createTask = useCallback(async (data: Omit<Task, 'id' | 'user_id' | 'created_at' | 'updated_at' | 'completed_at'>) => {
@@ -78,11 +165,17 @@ export function useTasks(projectId?: string) {
     setError(null)
     
     try {
+      // 新しいタスクのorder_indexを計算（最大値+1）
+      const maxOrderIndex = projectId 
+        ? Math.max(...allTasks.filter(t => t.project_id === projectId).map(t => t.order_index || 0), 0)
+        : Math.max(...allTasks.map(t => t.order_index || 0), 0)
+      
       const newTaskData = {
         ...data,
         user_id: user.id,
         status: 'pending' as const,
         completed_at: null,
+        order_index: maxOrderIndex + 1,
       }
 
       const { data: createdTask, error } = await supabase
@@ -108,7 +201,7 @@ export function useTasks(projectId?: string) {
     } finally {
       setLoading(false)
     }
-  }, [supabase, user])
+  }, [supabase, user, allTasks, projectId])
 
   // タスク更新
   const updateTask = useCallback(async (id: string, data: Partial<Omit<Task, 'id' | 'user_id' | 'created_at'>>) => {
@@ -247,5 +340,7 @@ export function useTasks(projectId?: string) {
     getRecentTasks,
     copyTasksToNotion,
     fetchTasks, // データ再取得用
+    updateTaskOrder, // 並び順更新
+    updateMultipleTaskOrder, // 複数タスク並び順更新
   }
 }

@@ -24,6 +24,26 @@ import { useTasks } from '@/hooks/useTasks'
 import { useProjects } from '@/hooks/useProjects'
 import TaskCard from './TaskCard'
 import Button from '@/components/ui/Button'
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
+import {
+  restrictToVerticalAxis,
+  restrictToParentElement,
+} from '@dnd-kit/modifiers'
+import SortableTaskCard from './SortableTaskCard'
 
 interface TaskListProps {
   projectId?: string
@@ -36,8 +56,16 @@ export default function TaskList({
   showAddButton = true,
   title = 'タスクリスト'
 }: TaskListProps) {
-  const { tasks, createTask, updateTask, deleteTask, toggleTaskStatus, copyTasksToNotion, loading } = useTasks(projectId)
+  const { tasks, createTask, updateTask, deleteTask, toggleTaskStatus, copyTasksToNotion, loading, updateMultipleTaskOrder } = useTasks(projectId)
   const { projects } = useProjects()
+  
+  // ドラッグ&ドロップセンサー設定
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  )
   
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null)
   const [isMultiSelectMode, setIsMultiSelectMode] = useState(false)
@@ -48,6 +76,9 @@ export default function TaskList({
 
   const pendingTasks = tasks.filter(task => task.status === 'pending')
   const completedTasks = tasks.filter(task => task.status === 'completed')
+  
+  // デバッグ: タスクの順序確認
+  console.log('📋 TaskList rendering. PendingTasks order:', pendingTasks.map(t => ({ id: t.id, name: t.name, order_index: t.order_index })))
 
   const getProjectForTask = (task: Task): Project | undefined => {
     return projects.find(p => p.id === task.project_id)
@@ -132,6 +163,41 @@ export default function TaskList({
     setSelectedTaskIds([])
   }
 
+  // ドラッグ終了時の処理
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event
+    
+    console.log('🎯 TaskList handleDragEnd called:', { activeId: active.id, overId: over?.id })
+    
+    if (!over || active.id === over.id) {
+      console.log('❌ No valid drop target or same position')
+      return
+    }
+    
+    const activeIndex = pendingTasks.findIndex(task => task.id === active.id)
+    const overIndex = pendingTasks.findIndex(task => task.id === over.id)
+    
+    console.log('📊 Drag indices:', { activeIndex, overIndex, pendingTasksCount: pendingTasks.length })
+    
+    if (activeIndex !== -1 && overIndex !== -1) {
+      try {
+        // 新しいorder_indexを計算してデータベースを更新
+        const newTasks = arrayMove(pendingTasks, activeIndex, overIndex)
+        const updates = newTasks.map((task, index) => ({
+          id: task.id,
+          order_index: index + 1
+        }))
+        
+        console.log('🔄 Calling updateMultipleTaskOrder from TaskList with updates:', updates)
+        await updateMultipleTaskOrder(updates)
+        console.log('✅ TaskList drag update completed')
+      } catch (error) {
+        console.error('❌ タスク順序更新エラー:', error)
+        // エラー時は元に戻すか、データを再取得する
+      }
+    }
+  }
+
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
       {/* ヘッダー */}
@@ -193,24 +259,37 @@ export default function TaskList({
       )}
 
       {/* 未完了タスクリスト */}
-      <div className="space-y-3">
-        {pendingTasks.map(task => (
-          <TaskCard
-            key={task.id}
-            task={task}
-            project={getProjectForTask(task)}
-            availableMembers={getAvailableMembersForTask(task)}
-            isEditing={editingTaskId === task.id}
-            isSelected={selectedTaskIds.includes(task.id)}
-            onEdit={() => handleEditTask(task.id)}
-            onSave={(data) => handleSaveTask(task.id, data)}
-            onCancel={handleCancelEdit}
-            onToggleStatus={() => toggleTaskStatus(task.id)}
-            onSelect={() => handleSelectTask(task.id)}
-            onCopy={() => handleCopyTask(task.id)}
-          />
-        ))}
-      </div>
+      <DndContext 
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragEnd={handleDragEnd}
+        modifiers={[restrictToVerticalAxis, restrictToParentElement]}
+      >
+        <SortableContext 
+          items={pendingTasks.map(task => task.id)}
+          strategy={verticalListSortingStrategy}
+        >
+          <div className="space-y-3">
+            {pendingTasks.map(task => (
+              <SortableTaskCard
+                key={task.id}
+                task={task}
+                project={getProjectForTask(task)}
+                availableMembers={getAvailableMembersForTask(task)}
+                isEditing={editingTaskId === task.id}
+                isSelected={selectedTaskIds.includes(task.id)}
+                onEdit={() => handleEditTask(task.id)}
+                onSave={(data) => handleSaveTask(task.id, data)}
+                onCancel={handleCancelEdit}
+                onToggleStatus={() => toggleTaskStatus(task.id)}
+                onSelect={() => handleSelectTask(task.id)}
+                onCopy={() => handleCopyTask(task.id)}
+                isMultiSelectMode={isMultiSelectMode}
+              />
+            ))}
+          </div>
+        </SortableContext>
+      </DndContext>
 
       {/* 完了タスクセクション */}
       {completedTasks.length > 0 && (
@@ -280,6 +359,7 @@ function NewTaskForm({ projectId, projects, availableMembers, onSave, onCancel, 
     start_date: new Date().toISOString().split('T')[0],
     end_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 1週間後
     status: 'pending' as const,
+    order_index: null as number | null,
   })
 
   const handleSubmit = () => {

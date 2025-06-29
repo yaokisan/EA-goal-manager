@@ -36,7 +36,7 @@ if (process.env.NODE_ENV === 'development') {
 export default function DashboardPage() {
   const [activeTab, setActiveTab] = useState('all')
   const [focusMode, setFocusMode] = useState(false)
-  const { tasks, getRecentTasks } = useTasks()
+  const { tasks, getRecentTasks, updateMultipleTaskOrder } = useTasks()
   const { projects } = useProjects()
 
   const getProjectIdForFilter = () => {
@@ -132,6 +132,7 @@ export default function DashboardPage() {
           activeTab={activeTab}
           focusMode={focusMode}
           taskStats={getTaskStats(getFilteredTasksForGantt(), activeTab)}
+          onTaskOrderChange={updateMultipleTaskOrder}
         />
         
         {/* タスクリスト */}

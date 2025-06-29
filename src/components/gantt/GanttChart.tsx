@@ -22,6 +22,26 @@
 import { useMemo, useState } from 'react'
 import { Task, Project } from '@/types'
 import { useFocusMode } from '@/hooks/useFocusMode'
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
+import {
+  restrictToVerticalAxis,
+  restrictToParentElement,
+} from '@dnd-kit/modifiers'
+import SortableGanttTask from './SortableGanttTask'
 
 interface GanttChartProps {
   tasks: Task[]
@@ -36,6 +56,7 @@ interface GanttChartProps {
     remaining: number
     progress: number
   }
+  onTaskOrderChange?: (updates: { id: string; order_index: number }[]) => Promise<void>
 }
 
 interface GanttTask {
@@ -75,12 +96,56 @@ export default function GanttChart({
   projects, 
   activeTab = 'all',
   focusMode = false,
-  taskStats = { total: 0, completed: 0, remaining: 0, progress: 0 }
+  taskStats = { total: 0, completed: 0, remaining: 0, progress: 0 },
+  onTaskOrderChange
 }: GanttChartProps) {
+  // ドラッグ&ドロップセンサー設定
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  )
   const [selectedTask, setSelectedTask] = useState<string | null>(null)
   const [selectedPeriod, setSelectedPeriod] = useState('2months')
   const [draggedTask, setDraggedTask] = useState<string | null>(null)
   const { focusData } = useFocusMode()
+
+  // ドラッグ終了時の処理
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event
+    
+    console.log('🎯 GanttChart handleDragEnd called:', { activeId: active.id, overId: over?.id })
+    
+    if (!over || active.id === over.id || !onTaskOrderChange) {
+      console.log('❌ No valid drop target, same position, or no handler')
+      return
+    }
+    
+    const activeIndex = ganttTasks.findIndex(task => task.id === active.id)
+    const overIndex = ganttTasks.findIndex(task => task.id === over.id)
+    
+    console.log('📊 GanttChart drag indices:', { activeIndex, overIndex, ganttTasksCount: ganttTasks.length })
+    
+    if (activeIndex !== -1 && overIndex !== -1) {
+      // 新しい順序での配列を作成
+      const newTasks = arrayMove(ganttTasks, activeIndex, overIndex)
+      
+      try {
+        // order_indexを更新
+        const updates = newTasks.map((task, index) => ({
+          id: task.id,
+          order_index: index + 1
+        }))
+        
+        console.log('🔄 Calling onTaskOrderChange from GanttChart...')
+        await onTaskOrderChange(updates)
+        console.log('✅ GanttChart drag update completed')
+      } catch (error) {
+        console.error('❌ ガントチャートタスク順序更新エラー:', error)
+      }
+    }
+  }
 
   // タスクデータをガントチャート用に変換
   const ganttTasks = useMemo((): GanttTask[] => {
@@ -320,36 +385,30 @@ export default function GanttChart({
           </div>
           
           {/* タスク一覧 */}
-          <div className="divide-y divide-gray-200">
-            {ganttTasks.map((task, index) => (
-              <div 
-                key={task.id}
-                className={`hover:bg-white transition-colors cursor-pointer ${
-                  selectedTask === task.id ? 'bg-blue-50 border-r-4 border-blue-500' : ''
-                }`}
-                style={{ height: '48px' }} // 進捗バーの高さ24px + 余白24px
-                onClick={() => setSelectedTask(task.id === selectedTask ? null : task.id)}
-              >
-                <div className="flex items-center space-x-3 h-full px-4">
-                  {/* アバター */}
-                  <div 
-                    className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
-                    style={{ backgroundColor: getAvatarColor(task.avatar) }}
-                  >
-                    {getAvatarInitials(task.avatar)}
-                  </div>
-                  
-                  {/* タスク情報 */}
-                  <div className="flex-1 min-w-0">
-                    <h4 className="font-medium text-gray-900 truncate text-sm">{task.name}</h4>
-                    <p className="text-xs text-gray-500">
-                      {task.assignees && task.assignees.length > 0 ? task.assignees.join(', ') : '未割当'} • {Math.ceil((task.endDate.getTime() - task.startDate.getTime()) / (1000 * 60 * 60 * 24))}日間
-                    </p>
-                  </div>
-                </div>
+          <DndContext 
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+            modifiers={[restrictToVerticalAxis, restrictToParentElement]}
+          >
+            <SortableContext 
+              items={ganttTasks.map(task => task.id)}
+              strategy={verticalListSortingStrategy}
+            >
+              <div className="divide-y divide-gray-200">
+                {ganttTasks.map((task, index) => (
+                  <SortableGanttTask
+                    key={task.id}
+                    task={task}
+                    isSelected={selectedTask === task.id}
+                    onSelect={() => setSelectedTask(task.id === selectedTask ? null : task.id)}
+                    getAvatarColor={getAvatarColor}
+                    getAvatarInitials={getAvatarInitials}
+                  />
+                ))}
               </div>
-            ))}
-          </div>
+            </SortableContext>
+          </DndContext>
         </div>
 
         {/* 右側: タイムライン */}

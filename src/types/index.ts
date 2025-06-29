@@ -42,6 +42,7 @@ export interface Task {
   status: 'pending' | 'completed'
   completed_at: string | null
   user_id: string
+  order_index: number | null // ドラッグ&ドロップ並び替え用
   created_at: string
   updated_at: string
   // フロントエンド拡張
