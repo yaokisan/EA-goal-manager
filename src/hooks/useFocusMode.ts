@@ -35,7 +35,7 @@ export interface FocusData {
 
 // デフォルトのフォーカスデータ（新規作成用）
 const defaultFocusData: Omit<FocusData, 'id' | 'user_id'> = {
-  goal: '新機能リリースまでにすべてのバグを修正する',
+  goal: '',
   deadline: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 2週間後
   project_id: null,
   is_active: true,
@@ -45,7 +45,7 @@ const defaultFocusData: Omit<FocusData, 'id' | 'user_id'> = {
 
 export function useFocusMode(projectId?: string) {
   const [focusData, setFocusData] = useState<FocusData | null>(null)
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true) // 初期状態をtrueに
   const [error, setError] = useState<string | null>(null)
   const supabase = createClient()
   const { user } = useAuth()
@@ -56,29 +56,10 @@ export function useFocusMode(projectId?: string) {
     console.log('認証状態 - user:', user?.id)
     
     if (!user) {
-      console.log('ユーザー未認証のため、ローカルストレージから復元')
-      // ユーザーが認証されていない場合はローカルストレージから復元、なければデフォルト
-      const savedFocusData = localStorage.getItem('focusData')
-      if (savedFocusData) {
-        try {
-          const parsedData = JSON.parse(savedFocusData)
-          console.log('ローカルストレージから復元:', parsedData)
-          setFocusData(parsedData)
-          return
-        } catch (error) {
-          console.error('ローカルストレージからのフォーカスデータ復元エラー:', error)
-        }
-      }
-      
-      // デフォルトデータを設定
-      const defaultData = {
-        ...defaultFocusData,
-        id: 'temp-id',
-        user_id: 'temp-user'
-      }
-      console.log('デフォルトデータを設定:', defaultData)
-      setFocusData(defaultData)
-      localStorage.setItem('focusData', JSON.stringify(defaultData))
+      console.log('ユーザー未認証のため、フォーカスモードは非表示')
+      // 認証されていない場合はフォーカスモードを表示しない
+      setFocusData(null)
+      setLoading(false)
       return
     }
 
@@ -119,25 +100,9 @@ export function useFocusMode(projectId?: string) {
         console.log('最新フォーカスモード検索結果:', { latestData, latestError })
 
         if (latestError && latestError.code === 'PGRST116') {
-          // 完全に新規ユーザーの場合
-          console.log('完全に新規ユーザー - フォーカスデータを新規作成')
-          const newFocusData = {
-            ...defaultFocusData,
-            user_id: user.id,
-            project_id: projectId || null
-          }
-          console.log('新規作成データ:', newFocusData)
-          
-          const { data: createdData, error: createError } = await supabase
-            .from('focus_modes')
-            .insert(newFocusData)
-            .select()
-            .single()
-
-          console.log('新規作成結果:', { createdData, createError })
-          
-          if (createError) throw createError
-          setFocusData(createdData)
+          // 完全に新規ユーザーの場合 - 自動作成しない
+          console.log('完全に新規ユーザー - フォーカスモードなし')
+          setFocusData(null)
         } else if (latestData) {
           // 既存のフォーカスモードをアクティブにして使用
           console.log('既存のフォーカスモードをアクティブに変更')
@@ -165,14 +130,8 @@ export function useFocusMode(projectId?: string) {
     } catch (err) {
       console.error('フォーカスデータ取得エラー:', err)
       setError('フォーカスデータの取得に失敗しました')
-      // エラーの場合もデフォルトデータを設定
-      const fallbackData = {
-        ...defaultFocusData,
-        id: 'error-fallback',
-        user_id: user?.id || 'temp-user'
-      }
-      console.log('エラー時のフォールバックデータ:', fallbackData)
-      setFocusData(fallbackData)
+      // エラーの場合はnullのままにしてフォーカスモードを非表示
+      setFocusData(null)
     } finally {
       setLoading(false)
     }

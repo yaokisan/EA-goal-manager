@@ -141,6 +141,19 @@ export const mockTasks: Task[] = [
     created_at: '2024-05-01T00:00:00Z',
     updated_at: '2024-05-01T00:00:00Z',
   },
+  {
+    id: 'task-7',
+    name: '複数担当者テストタスク',
+    project_id: 'project-a',
+    assignees: ['山田太郎', '佐藤次郎', '高橋健太'],
+    start_date: '2024-05-10',
+    end_date: '2024-05-20',
+    status: 'pending',
+    completed_at: null,
+    user_id: MOCK_USER_ID,
+    created_at: '2024-05-08T00:00:00Z',
+    updated_at: '2024-05-08T00:00:00Z',
+  },
 ]
 
 // モック売上目標データ

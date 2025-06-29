@@ -64,31 +64,37 @@ export default function TaskCard({
     }
   }, [onSave, editData])
 
-  const [enterPressCount, setEnterPressCount] = useState(0)
-
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
-      setEnterPressCount(prev => prev + 1)
-      
-      // 2回目のEnterで保存
-      if (enterPressCount >= 1) {
-        handleSave()
-        setEnterPressCount(0)
-      }
+      handleSave()
     } else if (e.key === 'Escape') {
       e.preventDefault()
       onCancel?.()
-    } else {
-      // 他のキーが押されたらEnterカウントをリセット
-      setEnterPressCount(0)
     }
   }
 
-  // 外側クリックで保存
+  // 外側クリックで保存（担当者・日付入力部分は除外）
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (isEditing && editFormRef.current && !editFormRef.current.contains(event.target as Node)) {
+        const target = event.target as HTMLElement
+        
+        // 担当者やカレンダー部分のクリックは除外
+        if (
+          target.type === 'checkbox' || 
+          target.type === 'date' || 
+          target.type === 'text' ||
+          target.closest('input[type="checkbox"]') ||
+          target.closest('input[type="date"]') ||
+          target.closest('input[type="text"]') ||
+          target.closest('label') ||
+          target.closest('.assignee-selector') ||
+          target.closest('.date-selector')
+        ) {
+          return
+        }
+        
         handleSave()
       }
     }
@@ -132,84 +138,99 @@ export default function TaskCard({
   if (isEditing) {
     return (
       <div ref={editFormRef} className={cardClass}>
-        <div className="space-y-3">
-          {/* タスク名編集 */}
-          <input
-            type="text"
-            value={editData.name}
-            onChange={(e) => setEditData({ ...editData, name: e.target.value })}
-            onKeyDown={handleKeyDown}
-            onBlur={handleSave}
-            className="w-full font-medium bg-transparent border-none outline-none text-gray-900 placeholder-gray-400"
-            placeholder="タスク名を入力"
-            autoFocus
-          />
-          
-          {/* メタ情報編集 */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-sm">
-            {availableMembers.length > 0 ? (
-              <div className="space-y-1">
-                <div className="text-xs text-gray-600">担当者 (複数選択可)</div>
-                <div className="max-h-20 overflow-y-auto border border-gray-300 rounded p-1">
-                  {availableMembers.map((member) => (
-                    <label key={member} className="flex items-center space-x-1 text-xs">
-                      <input
-                        type="checkbox"
-                        checked={editData.assignees.includes(member)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setEditData({ 
-                              ...editData, 
-                              assignees: [...editData.assignees, member] 
-                            })
-                          } else {
-                            setEditData({ 
-                              ...editData, 
-                              assignees: editData.assignees.filter(a => a !== member) 
-                            })
-                          }
-                        }}
-                        className="w-3 h-3"
-                      />
-                      <span>{member}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-1">
-                <div className="text-xs text-gray-600">担当者 (カンマ区切り)</div>
+        <div className="flex items-start space-x-3">
+          {/* タスク内容（編集モード） */}
+          <div className="flex-1 min-w-0">
+            {/* タスク名編集 */}
+            <h3 className="mb-1">
+              <input
+                type="text"
+                value={editData.name}
+                onChange={(e) => setEditData({ ...editData, name: e.target.value })}
+                onKeyDown={handleKeyDown}
+                className="w-full font-medium bg-transparent border-none outline-none text-gray-900 placeholder-gray-400"
+                placeholder="タスク名を入力"
+                autoFocus
+              />
+            </h3>
+            
+            {/* メタ情報編集（非編集時と同じレイアウト） */}
+            <div className="mt-1 flex flex-wrap items-center gap-2 text-sm">
+              {/* プロジェクトタグ（編集不可） */}
+              {project && (
+                <Tag color={project.color} size="sm">
+                  {project.name}
+                </Tag>
+              )}
+              
+              {/* 期間編集 */}
+              <div className="flex items-center space-x-1">
+                <span>📅</span>
                 <input
-                  type="text"
-                  value={editData.assignees.join(', ')}
-                  onChange={(e) => setEditData({ 
-                    ...editData, 
-                    assignees: e.target.value.split(',').map(a => a.trim()).filter(a => a) 
-                  })}
+                  type="date"
+                  value={editData.start_date}
+                  onChange={(e) => setEditData({ ...editData, start_date: e.target.value })}
                   onKeyDown={handleKeyDown}
-                  className="px-2 py-1 border border-gray-300 rounded text-sm w-full"
-                  placeholder="担当者 (複数の場合はカンマ区切り)"
+                  className="bg-transparent border-none outline-none text-sm date-selector"
+                />
+                <span>〜</span>
+                <input
+                  type="date"
+                  value={editData.end_date}
+                  onChange={(e) => setEditData({ ...editData, end_date: e.target.value })}
+                  onKeyDown={handleKeyDown}
+                  className="bg-transparent border-none outline-none text-sm date-selector"
                 />
               </div>
-            )}
-            <input
-              type="date"
-              value={editData.start_date}
-              onChange={(e) => setEditData({ ...editData, start_date: e.target.value })}
-              onKeyDown={handleKeyDown}
-              className="px-2 py-1 border border-gray-300 rounded text-sm"
-            />
-            <input
-              type="date"
-              value={editData.end_date}
-              onChange={(e) => setEditData({ ...editData, end_date: e.target.value })}
-              onKeyDown={handleKeyDown}
-              className="px-2 py-1 border border-gray-300 rounded text-sm"
-            />
-          </div>
-          
-          <div className="text-xs text-gray-500">
-            Enterで保存、Escでキャンセル
+              
+              {/* 担当者編集 */}
+              <div className="flex items-start space-x-1 assignee-selector">
+                <span className="mt-0.5">👤</span>
+                {availableMembers.length > 0 ? (
+                  <div className="flex flex-wrap gap-1">
+                    {availableMembers.map((member) => (
+                      <label key={member} className="flex items-center space-x-1 text-xs bg-gray-50 rounded px-2 py-1">
+                        <input
+                          type="checkbox"
+                          checked={editData.assignees.includes(member)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setEditData({ 
+                                ...editData, 
+                                assignees: [...editData.assignees, member] 
+                              })
+                            } else {
+                              setEditData({ 
+                                ...editData, 
+                                assignees: editData.assignees.filter(a => a !== member) 
+                              })
+                            }
+                          }}
+                          className="w-3 h-3"
+                        />
+                        <span>{member}</span>
+                      </label>
+                    ))}
+                  </div>
+                ) : (
+                  <input
+                    type="text"
+                    value={editData.assignees.join(', ')}
+                    onChange={(e) => setEditData({ 
+                      ...editData, 
+                      assignees: e.target.value.split(',').map(a => a.trim()).filter(a => a) 
+                    })}
+                    onKeyDown={handleKeyDown}
+                    className="bg-transparent border border-gray-300 rounded px-1 text-sm"
+                    placeholder="担当者"
+                  />
+                )}
+              </div>
+            </div>
+            
+            <div className="mt-1 text-xs text-gray-500">
+              Enterで保存、Escでキャンセル
+            </div>
           </div>
         </div>
       </div>

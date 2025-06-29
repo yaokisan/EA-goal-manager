@@ -67,7 +67,7 @@ export default function FocusMode({ isVisible, onClose }: FocusModeProps) {
     )
   }
   
-  if (!focusData) return null
+  if (!focusData || !focusData.goal || focusData.goal.trim() === '') return null
 
   const getUrgencyColor = () => {
     switch (urgencyLevel) {
