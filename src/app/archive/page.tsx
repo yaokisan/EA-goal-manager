@@ -20,6 +20,7 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useAuth } from '@/hooks/useAuth'
+import { FocusData } from '@/hooks/useFocusMode'
 
 // 仮のアーカイブデータ
 const mockArchivedTasks = [
@@ -63,7 +64,7 @@ const projects = [
 
 export default function ArchivePage() {
   const [selectedProject, setSelectedProject] = useState('all')
-  const [archivedFocusModes, setArchivedFocusModes] = useState([])
+  const [archivedFocusModes, setArchivedFocusModes] = useState<FocusData[]>([])
   const [loading, setLoading] = useState(true)
   const supabase = createClient()
   const { user } = useAuth()

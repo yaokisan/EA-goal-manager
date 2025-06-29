@@ -28,13 +28,6 @@ export function useProjects() {
   const supabase = createClient()
   const { user } = useAuth()
 
-  // 初期データ読み込み
-  useEffect(() => {
-    if (user) {
-      fetchProjects()
-    }
-  }, [user])
-
   // プロジェクト一覧取得
   const fetchProjects = useCallback(async () => {
     if (!user) return
@@ -56,6 +49,13 @@ export function useProjects() {
       setLoading(false)
     }
   }, [supabase, user])
+
+  // 初期データ読み込み
+  useEffect(() => {
+    if (user) {
+      fetchProjects()
+    }
+  }, [user, fetchProjects])
 
   // プロジェクト作成
   const createProject = useCallback(async (data: Omit<Project, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => {

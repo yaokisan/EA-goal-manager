@@ -256,7 +256,7 @@ export function useFocusMode(projectId?: string) {
     } finally {
       setLoading(false)
     }
-  }, [user, focusData, supabase])
+  }, [user, focusData, supabase, projectId])
 
   // 期限までの日数計算
   const calculateDaysRemaining = useCallback((deadline: string) => {
@@ -365,7 +365,7 @@ export function useFocusMode(projectId?: string) {
       console.error('フォーカス目標リセットエラー:', err)
       setError('フォーカス目標のリセットに失敗しました')
     }
-  }, [user, focusData, supabase, fetchFocusData, projectId])
+  }, [user, focusData, supabase, fetchFocusData])
 
   const daysRemaining = focusData ? calculateDaysRemaining(focusData.deadline) : 0
   const urgencyLevel = focusData ? getUrgencyLevel(focusData.deadline) : 'normal'

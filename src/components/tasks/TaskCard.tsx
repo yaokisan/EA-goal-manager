@@ -82,9 +82,9 @@ export default function TaskCard({
         
         // 担当者やカレンダー部分のクリックは除外
         if (
-          target.type === 'checkbox' || 
-          target.type === 'date' || 
-          target.type === 'text' ||
+          (target as HTMLInputElement).type === 'checkbox' || 
+          (target as HTMLInputElement).type === 'date' || 
+          (target as HTMLInputElement).type === 'text' ||
           target.closest('input[type="checkbox"]') ||
           target.closest('input[type="date"]') ||
           target.closest('input[type="text"]') ||

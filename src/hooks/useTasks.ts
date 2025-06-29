@@ -29,13 +29,6 @@ export function useTasks(projectId?: string) {
   const supabase = createClient()
   const { user } = useAuth()
 
-  // 初期データ読み込み
-  useEffect(() => {
-    if (user) {
-      fetchTasks()
-    }
-  }, [user])
-
   // タスク一覧取得
   const fetchTasks = useCallback(async () => {
     if (!user) return
@@ -64,6 +57,13 @@ export function useTasks(projectId?: string) {
       setLoading(false)
     }
   }, [supabase, user])
+
+  // 初期データ読み込み
+  useEffect(() => {
+    if (user) {
+      fetchTasks()
+    }
+  }, [user, fetchTasks])
 
   // プロジェクトでフィルタリングしたタスク
   const tasks = projectId 
