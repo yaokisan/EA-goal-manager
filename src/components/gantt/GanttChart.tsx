@@ -87,12 +87,18 @@ export default function GanttChart({
     return tasks.map(task => {
       const project = projects.find(p => p.id === task.project_id)
       
+      // 日付を正規化して時間による誤差を防ぐ
+      const startDate = new Date(task.start_date)
+      startDate.setHours(0, 0, 0, 0)
+      const endDate = new Date(task.end_date)
+      endDate.setHours(0, 0, 0, 0)
+      
       return {
         id: task.id,
         name: task.name,
         assignees: task.assignees || [],
-        startDate: new Date(task.start_date),
-        endDate: new Date(task.end_date),
+        startDate,
+        endDate,
         color: project?.color || '#6B7280',
         projectName: project?.name || 'Unknown',
         avatar: task.assignees && task.assignees.length > 0 ? task.assignees[0] : '未割当',
@@ -103,127 +109,146 @@ export default function GanttChart({
 
   // 表示期間を決定
   const { minDate, maxDate, totalDays } = useMemo(() => {
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
+    // タイムゾーンに依存しない日付計算
+    const now = new Date()
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    
+    
+    let resultMinDate: Date, resultMaxDate: Date
     
     // 直近1週間タブの場合は本日から1週間固定
     if (activeTab === 'recent') {
-      const weekEnd = new Date(today)
-      weekEnd.setDate(weekEnd.getDate() + 6) // 今日から6日後（計7日間）
-      
-      return {
-        minDate: today,
-        maxDate: weekEnd,
-        totalDays: 7
-      }
+      resultMinDate = new Date(today.getFullYear(), today.getMonth(), today.getDate())
+      resultMaxDate = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 6)
     }
-    
-    if (focusMode && focusData?.deadline) {
+    else if (focusMode && focusData?.deadline) {
       // フォーカスモードの場合、今日から期限までの期間を表示
-      const deadlineDate = new Date(focusData.deadline)
-      deadlineDate.setHours(0, 0, 0, 0)
+      const deadline = new Date(focusData.deadline)
+      const deadlineDate = new Date(deadline.getFullYear(), deadline.getMonth(), deadline.getDate())
       
-      // 1ヶ月前まで遡れるように開始日を調整
-      const oneMonthBefore = new Date(today)
-      oneMonthBefore.setMonth(oneMonthBefore.getMonth() - 1)
-      
-      return {
-        minDate: oneMonthBefore,
-        maxDate: deadlineDate,
-        totalDays: Math.ceil((deadlineDate.getTime() - oneMonthBefore.getTime()) / (1000 * 60 * 60 * 24))
-      }
+      // 1ヶ月前まで遡れるように開始日を調整（タイムゾーン対応）
+      resultMinDate = new Date(today.getFullYear(), today.getMonth() - 1, today.getDate())
+      resultMaxDate = deadlineDate
     }
-
-    // 通常モード：選択された期間
-    const selectedOption = PERIOD_OPTIONS.find(opt => opt.value === selectedPeriod)
-    if (selectedOption && selectedOption.days > 0) {
-      // 1ヶ月前から選択期間後まで
-      const oneMonthBefore = new Date(today)
-      oneMonthBefore.setMonth(oneMonthBefore.getMonth() - 1)
-      
-      const endDate = new Date(today.getTime() + selectedOption.days * 24 * 60 * 60 * 1000)
-      
-      return {
-        minDate: oneMonthBefore,
-        maxDate: endDate,
-        totalDays: Math.ceil((endDate.getTime() - oneMonthBefore.getTime()) / (1000 * 60 * 60 * 24))
+    else {
+      // 通常モード：選択された期間
+      const selectedOption = PERIOD_OPTIONS.find(opt => opt.value === selectedPeriod)
+      if (selectedOption && selectedOption.days > 0) {
+        // 1ヶ月前から選択期間後まで
+        resultMinDate = new Date(today.getFullYear(), today.getMonth() - 1, today.getDate())
+        resultMaxDate = new Date(today.getFullYear(), today.getMonth(), today.getDate() + selectedOption.days)
       }
-    }
-
-    // カスタムモード：タスクの期間に基づく（1ヶ月前〜タスク終了後まで）
-    if (ganttTasks.length === 0) {
-      const oneMonthBefore = new Date(today)
-      oneMonthBefore.setMonth(oneMonthBefore.getMonth() - 1)
-      const twoMonthsAfter = new Date(today)
-      twoMonthsAfter.setMonth(twoMonthsAfter.getMonth() + 2)
-      
-      return {
-        minDate: oneMonthBefore,
-        maxDate: twoMonthsAfter,
-        totalDays: Math.ceil((twoMonthsAfter.getTime() - oneMonthBefore.getTime()) / (1000 * 60 * 60 * 24))
-      }
-    }
-    
-    const allDates = ganttTasks.flatMap(task => [task.startDate, task.endDate])
-    const taskMinDate = new Date(Math.min(...allDates.map(d => d.getTime())))
-    const taskMaxDate = new Date(Math.max(...allDates.map(d => d.getTime())))
-    
-    // 1ヶ月前から、タスクまたは今日の2ヶ月後まで
-    const oneMonthBefore = new Date(today)
-    oneMonthBefore.setMonth(oneMonthBefore.getMonth() - 1)
-    
-    const finalMinDate = new Date(Math.min(oneMonthBefore.getTime(), taskMinDate.getTime() - 7 * 24 * 60 * 60 * 1000))
-    const finalMaxDate = new Date(Math.max(taskMaxDate.getTime() + 7 * 24 * 60 * 60 * 1000, today.getTime() + 60 * 24 * 60 * 60 * 1000))
-    
-    const days = Math.ceil((finalMaxDate.getTime() - finalMinDate.getTime()) / (1000 * 60 * 60 * 24))
-    
-    return {
-      minDate: finalMinDate,
-      maxDate: finalMaxDate,
-      totalDays: Math.max(days, 90)
-    }
-  }, [ganttTasks, selectedPeriod, focusMode, focusData, activeTab])
-
-  // 日付グリッドを生成
-  const dateGrid = useMemo(() => {
-    const grid = []
-    let currentMonth = new Date(minDate.getFullYear(), minDate.getMonth(), 1)
-    
-    while (currentMonth <= maxDate) {
-      const monthInfo = {
-        year: currentMonth.getFullYear(),
-        month: currentMonth.getMonth() + 1,
-        startDate: new Date(currentMonth),
-        endDate: new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0)
-      }
-      
-      // その月の日付を生成
-      const days = []
-      const firstDay = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1)
-      const lastDay = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0)
-      
-      for (let day = firstDay; day <= lastDay; day.setDate(day.getDate() + 1)) {
-        if (day >= minDate && day <= maxDate) {
-          days.push(new Date(day))
+      else {
+        // カスタムモード：タスクの期間に基づく（1ヶ月前〜タスク終了後まで）
+        if (ganttTasks.length === 0) {
+          resultMinDate = new Date(today.getFullYear(), today.getMonth() - 1, today.getDate())
+          resultMaxDate = new Date(today.getFullYear(), today.getMonth() + 2, today.getDate())
+        }
+        else {
+          const allDates = ganttTasks.flatMap(task => [task.startDate, task.endDate])
+          const taskMinDate = new Date(Math.min(...allDates.map(d => d.getTime())))
+          const taskMaxDate = new Date(Math.max(...allDates.map(d => d.getTime())))
+          
+          // 1ヶ月前から、タスクまたは今日の2ヶ月後まで  
+          const oneMonthBefore = new Date(today.getFullYear(), today.getMonth() - 1, today.getDate())
+          const twoMonthsAfter = new Date(today.getFullYear(), today.getMonth() + 2, today.getDate())
+          
+          const minTime = Math.min(oneMonthBefore.getTime(), taskMinDate.getTime() - 7 * 24 * 60 * 60 * 1000)
+          const maxTime = Math.max(taskMaxDate.getTime() + 7 * 24 * 60 * 60 * 1000, twoMonthsAfter.getTime())
+          
+          resultMinDate = new Date(minTime)
+          resultMaxDate = new Date(maxTime)
         }
       }
-      
-      grid.push({ ...monthInfo, days })
-      currentMonth.setMonth(currentMonth.getMonth() + 1)
     }
     
-    return grid
+    // 日付のみで作成されているため、正規化不要
+    
+    const result = {
+      minDate: resultMinDate,
+      maxDate: resultMaxDate,
+      totalDays: 0 // 日付グリッドで計算される実際の日数を使用
+    }
+    
+    
+    return result
+  }, [ganttTasks, selectedPeriod, focusMode, focusData, activeTab])
+
+  // 日付グリッドを生成し、実際の総日数を計算
+  const { dateGrid, actualTotalDays } = useMemo(() => {
+    // 期間計算と同じ方法で総日数を計算
+    const calculatedTotalDays = Math.ceil((maxDate.getTime() - minDate.getTime()) / (1000 * 60 * 60 * 24)) + 1
+    
+    // minDateからmaxDateまでの全ての日付を生成
+    const allDays = []
+    let currentDay = new Date(minDate)
+    
+    while (currentDay <= maxDate) {
+      allDays.push(new Date(currentDay))
+      currentDay.setDate(currentDay.getDate() + 1)
+    }
+    
+    // 月ごとにグループ化
+    const monthGroups = new Map()
+    allDays.forEach(day => {
+      const monthKey = `${day.getFullYear()}-${day.getMonth() + 1}`
+      if (!monthGroups.has(monthKey)) {
+        monthGroups.set(monthKey, {
+          year: day.getFullYear(),
+          month: day.getMonth() + 1,
+          days: []
+        })
+      }
+      monthGroups.get(monthKey).days.push(new Date(day))
+    })
+    
+    // グリッドを構築
+    const grid: Array<{
+      year: number
+      month: number
+      days: Date[]
+      startDate: Date
+      endDate: Date
+    }> = []
+    let totalDaysInGrid = 0
+    
+    monthGroups.forEach(monthInfo => {
+      grid.push({
+        ...monthInfo,
+        startDate: new Date(monthInfo.days[0]),
+        endDate: new Date(monthInfo.days[monthInfo.days.length - 1])
+      })
+      totalDaysInGrid += monthInfo.days.length
+    })
+    
+    
+    return {
+      dateGrid: grid,
+      actualTotalDays: calculatedTotalDays // 期間計算と一致させる
+    }
   }, [minDate, maxDate])
 
-  // 日付をパーセンテージに変換
+  // 日付をパーセンテージに変換（タイムゾーン対応）
   const dateToPercent = (date: Date) => {
-    const totalTime = maxDate.getTime() - minDate.getTime()
-    const taskTime = date.getTime() - minDate.getTime()
-    return Math.max(0, Math.min(100, (taskTime / totalTime) * 100))
+    // タイムゾーンに依存しない日付のみで計算
+    const targetDate = new Date(date.getFullYear(), date.getMonth(), date.getDate())
+    const baseDate = new Date(minDate.getFullYear(), minDate.getMonth(), minDate.getDate())
+    
+    // 日単位での差分を計算
+    const daysDiff = Math.floor((targetDate.getTime() - baseDate.getTime()) / (1000 * 60 * 60 * 24))
+    
+    // セルの中央に配置するため0.5を加算
+    const percent = ((daysDiff + 0.5) / actualTotalDays) * 100
+    
+    return Math.max(0, Math.min(100, percent))
   }
 
-  // 今日の位置を計算
-  const todayPercent = dateToPercent(new Date())
+  // 今日の位置を計算（タイムゾーン対応）
+  const now = new Date()
+  const todayForCalc = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const todayPercent = dateToPercent(todayForCalc)
+  
+  
 
   // プロジェクト別の凡例
   const projectsInUse = Array.from(new Set(ganttTasks.map(task => task.project)))
@@ -331,19 +356,19 @@ export default function GanttChart({
         <div className="flex-1 overflow-x-auto">
           {/* 月ヘッダー */}
           <div className="bg-blue-50 border-b border-gray-200">
-            <div className="flex" style={{ minWidth: '800px' }}>
+            <div className="flex" style={{ minWidth: `${actualTotalDays * 30}px` }}>
               {dateGrid.map((month, index) => (
                 <div 
                   key={`${month.year}-${month.month}`}
-                  className="border-r border-gray-200 last:border-r-0"
+                  className="border-r border-gray-200 last:border-r-0 bg-blue-50"
                   style={{
-                    width: `${(month.days.length / totalDays) * 100}%`,
+                    width: `${(month.days.length / actualTotalDays) * 100}%`,
                     minWidth: `${month.days.length * 30}px`
                   }}
                 >
-                  <div className="p-3 text-center">
-                    <div className="font-semibold text-gray-900">
-                      {month.year}年{month.month}月
+                  <div className="p-2 text-center bg-blue-50">
+                    <div className="font-semibold text-gray-900 text-sm whitespace-nowrap">
+                      {month.year}/{month.month}
                     </div>
                   </div>
                   
@@ -352,8 +377,11 @@ export default function GanttChart({
                     {month.days.map((day, dayIndex) => (
                       <div 
                         key={day.toISOString()}
-                        className="flex-1 text-center py-2 border-r border-gray-100 last:border-r-0"
-                        style={{ minWidth: '30px' }}
+                        className="text-center py-2 border-r border-gray-100 last:border-r-0 bg-blue-50"
+                        style={{ 
+                          width: `${(1 / actualTotalDays) * 100}%`,
+                          minWidth: '30px' 
+                        }}
                       >
                         <div className="text-xs text-gray-600">
                           {day.getDate()}
@@ -367,7 +395,10 @@ export default function GanttChart({
           </div>
 
           {/* タスクバー */}
-          <div className="relative" style={{ minWidth: '800px', minHeight: `${ganttTasks.length * 48}px` }}>
+          <div 
+            className="relative" 
+            style={{ minWidth: `${actualTotalDays * 30}px`, minHeight: `${ganttTasks.length * 48}px` }}
+          >
             {/* 今日の線 */}
             {todayPercent >= 0 && todayPercent <= 100 && (
               <div 
@@ -386,13 +417,14 @@ export default function GanttChart({
                 const dayOfWeek = day.getDay()
                 if (dayOfWeek === 0 || dayOfWeek === 6) {
                   const leftPercent = dateToPercent(day)
+                  
                   return (
                     <div
                       key={day.toISOString()}
                       className="absolute top-0 bottom-0 bg-gray-100 opacity-50"
                       style={{
-                        left: `${leftPercent}%`,
-                        width: `${100 / totalDays}%`
+                        left: `${leftPercent - (1 / actualTotalDays) * 50}%`,
+                        width: `${(1 / actualTotalDays) * 100}%`
                       }}
                     />
                   )
