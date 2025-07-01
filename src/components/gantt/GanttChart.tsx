@@ -122,6 +122,7 @@ export default function GanttChart({
   const [selectedPeriod, setSelectedPeriod] = useState('2months')
   const [draggedTask, setDraggedTask] = useState<string | null>(null)
   const [editingTask, setEditingTask] = useState<Task | null>(null)
+  const [showCompletedTasks, setShowCompletedTasks] = useState(false)
   
   // ガントチャート編集用の状態
   const [isDraggingGantt, setIsDraggingGantt] = useState(false)
@@ -289,6 +290,10 @@ export default function GanttChart({
       }
     })
   }, [tasks, projects])
+
+  // 完了タスクと未完了タスクを分離
+  const activeTasks = ganttTasks.filter(task => task.status !== 'completed')
+  const completedTasks = ganttTasks.filter(task => task.status === 'completed')
 
   // 表示期間を決定
   const { minDate, maxDate, totalDays } = useMemo(() => {
@@ -501,7 +506,7 @@ export default function GanttChart({
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
       {/* ヘッダー部分 */}
-      <div className="bg-gradient-to-r from-purple-600 via-purple-700 to-indigo-700 text-white p-6">
+      <div className="bg-gradient-to-r from-purple-600 via-purple-700 to-indigo-700 text-white p-4">
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-bold">プロジェクトタイムライン</h2>
           
@@ -539,12 +544,6 @@ export default function GanttChart({
           </div>
         </div>
 
-        {/* フォーカスモード表示 */}
-        {focusMode && (
-          <div className="mt-4 text-sm opacity-90">
-            フォーカスモード: 目標期限までの期間を表示中
-          </div>
-        )}
       </div>
 
       {/* メインコンテンツ */}
@@ -553,13 +552,21 @@ export default function GanttChart({
         <div className="w-80 bg-gray-50 border-r border-gray-200">
           {/* タスクヘッダー - 右側のヘッダー高さに合わせる */}
           <div className="bg-gray-100 border-b border-gray-200">
-            <div className="p-3 text-center">
-              <h3 className="font-semibold text-gray-900">タスク</h3>
+            <div className="p-2 text-center bg-blue-50" style={{ height: '40px' }}>
+              <h3 className="font-semibold text-gray-900 text-sm">タスク</h3>
             </div>
-            <div className="flex border-t border-gray-200">
-              <div className="flex-1 text-center py-2">
-                <div className="text-xs text-gray-600">担当者</div>
-              </div>
+            <div className="flex border-t border-gray-200 bg-gray-100" style={{ height: '40px' }}>
+              <button
+                onClick={() => setShowCompletedTasks(!showCompletedTasks)}
+                className="flex-1 flex items-center justify-center hover:bg-gray-200 transition-colors"
+              >
+                <span className={`mr-2 text-gray-400 transition-transform ${showCompletedTasks ? 'rotate-90' : ''}`}>
+                  ▶
+                </span>
+                <span className="text-xs font-semibold text-gray-600">
+                  Done {completedTasks.length > 0 && `(${completedTasks.length})`}
+                </span>
+              </button>
             </div>
           </div>
           
@@ -571,11 +578,31 @@ export default function GanttChart({
             modifiers={[restrictToVerticalAxis, restrictToParentElement]}
           >
             <SortableContext 
-              items={ganttTasks.map(task => task.id)}
+              items={showCompletedTasks ? [...completedTasks, ...activeTasks].map(task => task.id) : activeTasks.map(task => task.id)}
               strategy={verticalListSortingStrategy}
             >
               <div className="divide-y divide-gray-200">
-                {ganttTasks.map((task, index) => (
+                {/* 完了タスク（展開時のみ表示） */}
+                {showCompletedTasks && completedTasks.map((task, index) => (
+                  <SortableGanttTask
+                    key={task.id}
+                    task={task}
+                    isSelected={selectedTask === task.id}
+                    onSelect={() => {
+                      const originalTask = tasks.find(t => t.id === task.id)
+                      if (originalTask) {
+                        setEditingTask(originalTask)
+                      }
+                    }}
+                    onToggleStatus={toggleTaskStatus ? () => toggleTaskStatus(task.id) : undefined}
+                    onDelete={deleteTask ? () => deleteTask(task.id) : undefined}
+                    getAvatarColor={getAvatarColor}
+                    getAvatarInitials={getAvatarInitials}
+                  />
+                ))}
+                
+                {/* アクティブタスク */}
+                {activeTasks.map((task, index) => (
                   <SortableGanttTask
                     key={task.id}
                     task={task}
@@ -611,18 +638,18 @@ export default function GanttChart({
                     minWidth: `${month.days.length * 30}px`
                   }}
                 >
-                  <div className="p-2 text-center bg-blue-50">
+                  <div className="p-2 text-center bg-blue-50" style={{ height: '40px' }}>
                     <div className="font-semibold text-gray-900 text-sm whitespace-nowrap">
                       {month.year}/{month.month}
                     </div>
                   </div>
                   
                   {/* 日付グリッド */}
-                  <div className="flex border-t border-gray-200">
+                  <div className="flex border-t border-gray-200" style={{ height: '40px' }}>
                     {month.days.map((day, dayIndex) => (
                       <div 
                         key={day.toISOString()}
-                        className="text-center py-2 border-r border-gray-100 last:border-r-0 bg-blue-50"
+                        className="text-center flex items-center justify-center border-r border-gray-100 last:border-r-0 bg-blue-50"
                         style={{ 
                           width: `${(1 / actualTotalDays) * 100}%`,
                           minWidth: '30px' 
@@ -642,7 +669,7 @@ export default function GanttChart({
           {/* タスクバー */}
           <div 
             className="relative" 
-            style={{ minWidth: `${actualTotalDays * 30}px`, minHeight: `${ganttTasks.length * 48}px` }}
+            style={{ minWidth: `${actualTotalDays * 30}px`, minHeight: `${(showCompletedTasks ? completedTasks.length * 56 : 0) + (activeTasks.length * 56)}px` }}
             data-gantt-container
             onMouseMove={handleGanttDragMove}
             onMouseUp={handleGanttDragEnd}
@@ -682,8 +709,8 @@ export default function GanttChart({
               })
             )}
 
-            {/* タスクバー */}
-            {ganttTasks.map((task, index) => {
+            {/* 完了タスクのバー（展開時のみ表示） */}
+            {showCompletedTasks && completedTasks.map((task, index) => {
               // ドラッグ中の一時的な日付を使用
               const currentStartDate = (isDraggingGantt && draggedTask === task.id && dragStartDate) 
                 ? dragStartDate 
@@ -703,23 +730,19 @@ export default function GanttChart({
                   key={task.id}
                   className="absolute flex items-center group"
                   style={{
-                    top: `${index * 48 + 12}px`, // タスクの中央に配置 (48px高さの中央は24px、バー高さ24pxなので12pxオフセット)
+                    top: `${index * 56 + 16}px`, // 完了タスクは最上部に配置
                     left: `${startPercent}%`,
                     width: `${Math.max(width, 5)}%`,
-                    height: '24px' // 進捗バーの高さを少し小さく
+                    height: '24px' // 進捗バーの高さ
                   }}
                 >
                   {/* タスクバー本体 */}
                   <div
                     className={`relative h-full w-full rounded-lg shadow-sm transition-all duration-200 select-none ${
                       isDragged || (isDraggingGantt && draggedTask === task.id) ? 'cursor-grabbing scale-105 shadow-xl ring-2 ring-blue-400' : 'cursor-move'
-                    } ${isSelected ? 'ring-2 ring-gray-400' : ''} hover:shadow-md ${
-                      task.status === 'completed' ? 'opacity-60' : ''
-                    }`}
+                    } ${isSelected ? 'ring-2 ring-gray-400' : ''} hover:shadow-md opacity-60`}
                     style={{ 
-                      background: task.status === 'completed' 
-                        ? `linear-gradient(135deg, #9CA3AF 0%, #9CA3AFDD 50%, #9CA3AFBB 100%)` // 完了タスクは灰色
-                        : `linear-gradient(135deg, ${task.color} 0%, ${task.color}DD 50%, ${task.color}BB 100%)`,
+                      background: `linear-gradient(135deg, #9CA3AF 0%, #9CA3AFDD 50%, #9CA3AFBB 100%)` // 完了タスクは灰色
                     }}
                     onMouseDown={(e) => {
                       // 左クリックでドラッグ開始
@@ -743,9 +766,124 @@ export default function GanttChart({
                     {/* タスク名 */}
                     {width > 10 && (
                       <div className="absolute inset-0 flex items-center px-3 pointer-events-none">
-                        <span className={`text-white text-sm font-medium truncate ${
-                          task.status === 'completed' ? 'line-through' : ''
-                        }`}>
+                        <span className="text-white text-sm font-medium truncate line-through">
+                          {task.name}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* ドラッグ中の日付フィードバック */}
+                    {isDraggingGantt && draggedTask === task.id && dragStartDate && dragEndDate && (
+                      <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded whitespace-nowrap z-20">
+                        {dragStartDate.toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric' })} 〜 {dragEndDate.toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric' })}
+                      </div>
+                    )}
+
+                    {/* リサイズハンドル */}
+                    <>
+                      {/* 左ハンドル - より大きなヒット領域とスタイリング */}
+                      <div 
+                        className={`absolute top-0 bottom-0 flex items-center justify-center cursor-ew-resize transition-all duration-200 ${
+                          isSelected || isDragged 
+                            ? 'opacity-100' 
+                            : 'opacity-0 group-hover:opacity-100'
+                        }`}
+                        style={{ 
+                          left: '-8px', 
+                          width: '16px' // より大きなクリック領域
+                        }}
+                        onMouseDown={(e) => {
+                          e.stopPropagation()
+                          setSelectedTask(task.id) // タスクを選択状態にする
+                          handleGanttDragStart(e, task.id, 'resize-start')
+                        }}
+                      >
+                        <div className="w-1 h-6 bg-white rounded-full shadow-lg border border-gray-300 hover:bg-gray-50 transition-colors" />
+                      </div>
+                      
+                      {/* 右ハンドル - より大きなヒット領域とスタイリング */}
+                      <div 
+                        className={`absolute top-0 bottom-0 flex items-center justify-center cursor-ew-resize transition-all duration-200 ${
+                          isSelected || isDragged 
+                            ? 'opacity-100' 
+                            : 'opacity-0 group-hover:opacity-100'
+                        }`}
+                        style={{ 
+                          right: '-8px', 
+                          width: '16px' // より大きなクリック領域
+                        }}
+                        onMouseDown={(e) => {
+                          e.stopPropagation()
+                          setSelectedTask(task.id) // タスクを選択状態にする
+                          handleGanttDragStart(e, task.id, 'resize-end')
+                        }}
+                      >
+                        <div className="w-1 h-6 bg-white rounded-full shadow-lg border border-gray-300 hover:bg-gray-50 transition-colors" />
+                      </div>
+                    </>
+                  </div>
+                </div>
+              )
+            })}
+
+            {/* アクティブタスクのバー */}
+            {activeTasks.map((task, index) => {
+              // ドラッグ中の一時的な日付を使用
+              const currentStartDate = (isDraggingGantt && draggedTask === task.id && dragStartDate) 
+                ? dragStartDate 
+                : task.startDate
+              const currentEndDate = (isDraggingGantt && draggedTask === task.id && dragEndDate) 
+                ? dragEndDate 
+                : task.endDate
+
+              const startPercent = dateToPercent(currentStartDate)
+              const endPercent = dateToPercent(currentEndDate)
+              const width = endPercent - startPercent
+              const isSelected = selectedTask === task.id
+              const isDragged = draggedTask === task.id
+
+              return (
+                <div
+                  key={task.id}
+                  className="absolute flex items-center group"
+                  style={{
+                    top: `${(showCompletedTasks ? completedTasks.length * 56 : 0) + (index * 56) + 16}px`,
+                    left: `${startPercent}%`,
+                    width: `${Math.max(width, 5)}%`,
+                    height: '24px'
+                  }}
+                >
+                  {/* タスクバー本体 */}
+                  <div
+                    className={`relative h-full w-full rounded-lg shadow-sm transition-all duration-200 select-none ${
+                      isDragged || (isDraggingGantt && draggedTask === task.id) ? 'cursor-grabbing scale-105 shadow-xl ring-2 ring-blue-400' : 'cursor-move'
+                    } ${isSelected ? 'ring-2 ring-gray-400' : ''} hover:shadow-md`}
+                    style={{ 
+                      background: `linear-gradient(135deg, ${task.color} 0%, ${task.color}DD 50%, ${task.color}BB 100%)`
+                    }}
+                    onMouseDown={(e) => {
+                      // 左クリックでドラッグ開始
+                      if (e.button === 0) { // 左クリック
+                        e.preventDefault()
+                        setSelectedTask(task.id) // タスクを選択状態にする
+                        handleGanttDragStart(e, task.id, 'move')
+                      }
+                    }}
+                    onClick={(e) => {
+                      // ドラッグしていない場合のみモーダルを開く
+                      if (!isDraggingGantt) {
+                        const originalTask = tasks.find(t => t.id === task.id)
+                        if (originalTask) {
+                          setSelectedTask(task.id) // タスクを選択状態にする
+                          setEditingTask(originalTask)
+                        }
+                      }
+                    }}
+                  >
+                    {/* タスク名 */}
+                    {width > 10 && (
+                      <div className="absolute inset-0 flex items-center px-3 pointer-events-none">
+                        <span className="text-white text-sm font-medium truncate">
                           {task.name}
                         </span>
                       </div>
@@ -806,11 +944,18 @@ export default function GanttChart({
             })}
 
             {/* グリッド線 */}
-            {ganttTasks.map((_, index) => (
+            {showCompletedTasks && completedTasks.map((_, index) => (
               <div
-                key={index}
+                key={`completed-${index}`}
                 className="absolute left-0 right-0 border-b border-gray-100"
-                style={{ top: `${(index + 1) * 48}px` }}
+                style={{ top: `${(index + 1) * 56}px` }}
+              />
+            ))}
+            {activeTasks.map((_, index) => (
+              <div
+                key={`active-${index}`}
+                className="absolute left-0 right-0 border-b border-gray-100"
+                style={{ top: `${(showCompletedTasks ? completedTasks.length * 56 : 0) + ((index + 1) * 56)}px` }}
               />
             ))}
           </div>

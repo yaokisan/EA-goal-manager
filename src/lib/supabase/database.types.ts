@@ -158,6 +158,29 @@ export interface Database {
           updated_at?: string
         }
       }
+      project_tab_orders: {
+        Row: {
+          id: string
+          user_id: string
+          project_orders: string[] | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          project_orders?: string[] | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          project_orders?: string[] | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
     }
     Views: {
       [_ in never]: never

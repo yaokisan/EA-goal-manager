@@ -105,7 +105,7 @@ export default function SortableGanttTask({
       {/* タスク本体 */}
       <div 
         className="pl-6"
-        style={{ height: '48px' }} // 進捗バーの高さ24px + 余白24px
+        style={{ height: '56px' }} // ガントチャートの行高さに合わせる
       >
         <div className="flex items-center space-x-3 h-full px-4">
           {/* チェックボックス */}
@@ -135,7 +135,7 @@ export default function SortableGanttTask({
               {task.name}
             </h4>
             <p className="text-xs text-gray-500">
-              {task.assignees && task.assignees.length > 0 ? task.assignees.join(', ') : '未割当'} • {Math.ceil((task.endDate.getTime() - task.startDate.getTime()) / (1000 * 60 * 60 * 24))}日間
+              {task.assignees && task.assignees.length > 0 ? task.assignees.join(', ') : '未割当'} • {task.startDate.getMonth() + 1}/{task.startDate.getDate()}〜{task.endDate.getMonth() + 1}/{task.endDate.getDate()}
             </p>
           </div>
           
