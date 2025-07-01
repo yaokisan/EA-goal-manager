@@ -18,7 +18,7 @@
 
 'use client'
 
-import { useState } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { Task, Project } from '@/types'
 import { useTasks } from '@/hooks/useTasks'
 import { useProjects } from '@/hooks/useProjects'
@@ -32,6 +32,7 @@ import {
   useSensor,
   useSensors,
   DragEndEvent,
+  DragStartEvent,
 } from '@dnd-kit/core'
 import {
   arrayMove,
@@ -49,13 +50,14 @@ interface TaskListProps {
   projectId?: string
   showAddButton?: boolean
   title?: string
-  tasks?: any[]
+  tasks?: any[]  // オプショナルに戻す（後方互換性のため）
   updateTask?: (id: string, data: any) => Promise<void>
   toggleTaskStatus?: (id: string) => Promise<void>
   copyTasksToNotion?: (taskIds: string[]) => string
   createTask?: (data: any) => Promise<any>
   deleteTask?: (id: string) => Promise<void>
   loading?: boolean
+  onTaskOrderChange?: (updates: { id: string; order_index: number }[], projectId?: string) => Promise<void> // オプショナル
 }
 
 export default function TaskList({ 
@@ -68,22 +70,13 @@ export default function TaskList({
   copyTasksToNotion: propCopyTasksToNotion,
   createTask: propCreateTask,
   deleteTask: propDeleteTask,
-  loading: propLoading
+  loading: propLoading,
+  onTaskOrderChange
 }: TaskListProps) {
-  // フォールバック用のuseTasks（propsが渡されない場合のみ使用）
-  const fallbackUseTasks = useTasks(projectId)
+  // ガントチャートと同じシンプルなパターン
   const { projects } = useProjects()
   
-  // propsから渡された値があればそれを使用、なければフォールバック
-  const tasks = propTasks ?? fallbackUseTasks.tasks
-  const createTask = propCreateTask ?? fallbackUseTasks.createTask
-  const updateTask = propUpdateTask ?? fallbackUseTasks.updateTask
-  const deleteTask = propDeleteTask ?? fallbackUseTasks.deleteTask
-  const toggleTaskStatus = propToggleTaskStatus ?? fallbackUseTasks.toggleTaskStatus
-  const copyTasksToNotion = propCopyTasksToNotion ?? fallbackUseTasks.copyTasksToNotion
-  const loading = propLoading ?? fallbackUseTasks.loading
-  const updateMultipleTaskOrder = fallbackUseTasks.updateMultipleTaskOrder
-  
+  // Hooks は条件分岐の前に宣言（React のルール）
   // ドラッグ&ドロップセンサー設定
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -98,14 +91,42 @@ export default function TaskList({
   const [showCompleted, setShowCompleted] = useState(false)
   const [isAddingTask, setIsAddingTask] = useState(false)
   const [copyFeedback, setCopyFeedback] = useState<string | null>(null)
+  const [dragFeedback, setDragFeedback] = useState<string | null>(null)
+  const [isDragInProgress, setIsDragInProgress] = useState(false)
 
-  // プロジェクト別フィルタリング処理（propsでtasksが渡された場合）
-  const filteredTasks = propTasks ? (
-    projectId ? propTasks.filter(task => task.project_id === projectId) : propTasks
-  ) : tasks
+  // propsから受け取ったデータと関数を使用（ガントチャートと同じパターン）
+  const tasks = propTasks || []
+  const updateTask = propUpdateTask || (() => Promise.resolve())
+  const toggleTaskStatus = propToggleTaskStatus || (() => Promise.resolve())
+  const copyTasksToNotion = propCopyTasksToNotion || (() => '')
+  const createTask = propCreateTask || (() => Promise.resolve({}))
+  const deleteTask = propDeleteTask || (() => Promise.resolve())
+  const loading = propLoading || false
+
+  // シンプルなフィルタリング（ガントチャートと同じパターン）
+  const filteredTasks = projectId 
+    ? tasks.filter(task => task.project_id === projectId) 
+    : tasks
   
   const pendingTasks = filteredTasks.filter(task => task.status === 'pending')
   const completedTasks = filteredTasks.filter(task => task.status === 'completed')
+  
+  // デバッグ情報を出力（プロジェクト指定時のみ）
+  useEffect(() => {
+    if (projectId && pendingTasks.length > 0) {
+      console.log('📋 TaskList - pendingTasks order:', pendingTasks.map(t => ({ 
+        id: t.id.slice(0,8), 
+        name: t.name.slice(0,20), 
+        order_index: t.order_index 
+      })))
+    }
+  }, [pendingTasks, projectId])
+
+  // propsからのデータが提供されていない場合はフォールバックを使用
+  if (!propTasks || !propUpdateTask || !propToggleTaskStatus || !propCopyTasksToNotion || !propCreateTask || !propDeleteTask || propLoading === undefined) {
+    // フォールバック用コンポーネントを使用
+    return <TaskListFallback projectId={projectId} showAddButton={showAddButton} title={title} />
+  }
   
 
   const getProjectForTask = (task: Task): Project | undefined => {
@@ -191,32 +212,54 @@ export default function TaskList({
     setSelectedTaskIds([])
   }
 
-  // ドラッグ終了時の処理
+  // ドラッグ開始時の処理
+  const handleDragStart = (event: DragStartEvent) => {
+    setIsDragInProgress(true)
+    console.log('🎯 ドラッグ開始:', event.active.id)
+  }
+
+  // ドラッグ終了時の処理（リアルタイム更新のみ）
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event
     
+    setIsDragInProgress(false)
+    console.log('🎯 TaskList handleDragEnd:', { activeId: active.id, overId: over?.id, projectId })
     
     if (!over || active.id === over.id) {
+      console.log('❌ 無効なドロップまたは同じ位置')
       return
     }
     
     const activeIndex = pendingTasks.findIndex(task => task.id === active.id)
     const overIndex = pendingTasks.findIndex(task => task.id === over.id)
     
+    console.log('📊 ドラッグインデックス:', { activeIndex, overIndex, pendingTasksCount: pendingTasks.length })
     
     if (activeIndex !== -1 && overIndex !== -1) {
       try {
-        // 新しいorder_indexを計算してデータベースを更新
+        // プロジェクト内でのorder_index計算（1から連番）
         const newTasks = arrayMove(pendingTasks, activeIndex, overIndex)
         const updates = newTasks.map((task, index) => ({
           id: task.id,
-          order_index: index + 1
+          order_index: index + 1  // プロジェクト内での連番
         }))
         
-        await updateMultipleTaskOrder(updates)
+        console.log('🔄 onTaskOrderChange呼び出し（新パターン）:', { updates, projectId })
+        // ガントチャートと同じパターンで直接呼び出し
+        await onTaskOrderChange!(updates, projectId)
+        
+        console.log('✅ タスク順序更新完了 - リアルタイム更新を待機中')
+        
+        // 成功時の視覚的フィードバック
+        setDragFeedback('順序を更新しました')
+        setTimeout(() => setDragFeedback(null), 2000)
+        
       } catch (error) {
         console.error('❌ タスク順序更新エラー:', error)
-        // エラー時は元に戻すか、データを再取得する
+        
+        // エラー時の視覚的フィードバック
+        setDragFeedback('更新に失敗しました')
+        setTimeout(() => setDragFeedback(null), 3000)
       }
     }
   }
@@ -227,6 +270,15 @@ export default function TaskList({
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
         <div className="flex items-center space-x-2">
+          {/* ドラッグフィードバック */}
+          {dragFeedback && (
+            <span className={`text-sm font-medium ${
+              dragFeedback.includes('失敗') ? 'text-red-600' : 'text-green-600'
+            }`}>
+              {dragFeedback}
+            </span>
+          )}
+          
           {/* コピーフィードバック */}
           {copyFeedback && (
             <span className="text-sm text-green-600 font-medium">
@@ -285,6 +337,7 @@ export default function TaskList({
       <DndContext 
         sensors={sensors}
         collisionDetection={closestCenter}
+        onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
         modifiers={[restrictToVerticalAxis, restrictToParentElement]}
       >
@@ -360,6 +413,165 @@ export default function TaskList({
           )}
         </div>
       )}
+    </div>
+  )
+}
+
+// フォールバック用の従来のTaskListコンポーネント
+interface TaskListFallbackProps {
+  projectId?: string
+  showAddButton?: boolean
+  title?: string
+}
+
+function TaskListFallback({ 
+  projectId, 
+  showAddButton = true,
+  title = 'タスクリスト'
+}: TaskListFallbackProps) {
+  const { tasks, createTask, updateTask, deleteTask, toggleTaskStatus, copyTasksToNotion, loading, updateMultipleTaskOrder } = useTasks(projectId)
+  const { projects } = useProjects()
+  
+  // 従来通りのフォールバック実装
+  // ドラッグ&ドロップセンサー設定
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  )
+  
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null)
+  const [isMultiSelectMode, setIsMultiSelectMode] = useState(false)
+  const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([])
+  const [showCompleted, setShowCompleted] = useState(false)
+  const [isAddingTask, setIsAddingTask] = useState(false)
+  const [copyFeedback, setCopyFeedback] = useState<string | null>(null)
+  const [dragFeedback, setDragFeedback] = useState<string | null>(null)
+
+  // シンプルなフィルタリング
+  const filteredTasks = projectId 
+    ? tasks.filter(task => task.project_id === projectId) 
+    : tasks
+  
+  const pendingTasks = filteredTasks.filter(task => task.status === 'pending')
+  const completedTasks = filteredTasks.filter(task => task.status === 'completed')
+
+  const getProjectForTask = (task: Task): Project | undefined => {
+    return projects.find(p => p.id === task.project_id)
+  }
+
+  const getAvailableMembersForTask = (task: Task): string[] => {
+    const taskProject = getProjectForTask(task)
+    return taskProject?.members || []
+  }
+
+  const getAvailableMembersForNewTask = (): string[] => {
+    if (projectId) {
+      const project = projects.find(p => p.id === projectId)
+      return project?.members || []
+    }
+    const allMembers = new Set<string>()
+    projects.forEach(project => {
+      project.members?.forEach(member => allMembers.add(member))
+    })
+    return Array.from(allMembers)
+  }
+
+  const handleAddTask = async (data: Omit<Task, 'id' | 'user_id' | 'created_at' | 'updated_at' | 'completed_at'>) => {
+    try {
+      await createTask(data)
+      setIsAddingTask(false)
+    } catch (error) {
+      console.error('タスク作成エラー:', error)
+    }
+  }
+
+  const handleEditTask = (taskId: string) => {
+    setEditingTaskId(taskId)
+  }
+
+  const handleSaveTask = async (taskId: string, data: Partial<Task>) => {
+    try {
+      await updateTask(taskId, data)
+      setEditingTaskId(null)
+    } catch (error) {
+      console.error('タスク更新エラー:', error)
+    }
+  }
+
+  const handleCancelEdit = () => {
+    setEditingTaskId(null)
+    setIsAddingTask(false)
+  }
+
+  const handleSelectTask = (taskId: string) => {
+    if (!isMultiSelectMode) return
+    
+    setSelectedTaskIds(prev => 
+      prev.includes(taskId) 
+        ? prev.filter(id => id !== taskId)
+        : [...prev, taskId]
+    )
+  }
+
+  const handleCopyTask = (taskId: string) => {
+    copyTasksToNotion([taskId])
+    showCopyFeedback()
+  }
+
+  const handleBulkCopy = () => {
+    copyTasksToNotion(selectedTaskIds)
+    setSelectedTaskIds([])
+    setIsMultiSelectMode(false)
+    showCopyFeedback()
+  }
+
+  const showCopyFeedback = () => {
+    setCopyFeedback('コピー済み')
+    setTimeout(() => setCopyFeedback(null), 1500)
+  }
+
+  const toggleMultiSelectMode = () => {
+    setIsMultiSelectMode(!isMultiSelectMode)
+    setSelectedTaskIds([])
+  }
+
+  // ドラッグ終了時の処理（従来通り）
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event
+    
+    if (!over || active.id === over.id) {
+      return
+    }
+    
+    const activeIndex = pendingTasks.findIndex(task => task.id === active.id)
+    const overIndex = pendingTasks.findIndex(task => task.id === over.id)
+    
+    if (activeIndex !== -1 && overIndex !== -1) {
+      try {
+        const newTasks = arrayMove(pendingTasks, activeIndex, overIndex)
+        const updates = newTasks.map((task, index) => ({
+          id: task.id,
+          order_index: index + 1
+        }))
+        
+        await updateMultipleTaskOrder(updates, projectId)
+        
+        setDragFeedback('順序を更新しました')
+        setTimeout(() => setDragFeedback(null), 2000)
+        
+      } catch (error) {
+        console.error('❌ タスク順序更新エラー:', error)
+        setDragFeedback('更新に失敗しました')
+        setTimeout(() => setDragFeedback(null), 3000)
+      }
+    }
+  }
+
+  return (
+    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+      <p className="text-gray-500">フォールバックTaskList: dev-dashboard等で使用</p>
     </div>
   )
 }

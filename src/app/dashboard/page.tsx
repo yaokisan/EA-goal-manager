@@ -57,6 +57,13 @@ export default function DashboardPage() {
     return activeTab
   }
 
+  const getCurrentProjectId = () => {
+    if (activeTab === 'recent' || activeTab === 'all') {
+      return undefined
+    }
+    return activeTab
+  }
+
   const { getTaskStats } = useFocusMode(getProjectIdForFilter())
 
   // フォーカスモード状態をローカルストレージから復元
@@ -143,8 +150,9 @@ export default function DashboardPage() {
           activeTab={activeTab}
           focusMode={focusMode}
           taskStats={getTaskStats(getFilteredTasksForGantt(), activeTab)}
-          onTaskOrderChange={updateMultipleTaskOrder}
+          onTaskOrderChange={(updates, projectId) => updateMultipleTaskOrder(updates, projectId)}
           updateTask={updateTask}
+          projectId={getCurrentProjectId()}
         />
         
         {/* タスクリスト */}
@@ -160,6 +168,7 @@ export default function DashboardPage() {
           deleteTask={deleteTask}
           loading={loading}
           getRecentTasks={getRecentTasks}
+          updateMultipleTaskOrder={updateMultipleTaskOrder}
         />
       </div>
     </div>
@@ -179,6 +188,7 @@ interface FilteredTaskListProps {
   deleteTask: (id: string) => Promise<void>
   loading: boolean
   getRecentTasks: () => any[]
+  updateMultipleTaskOrder: (updates: { id: string; order_index: number }[], projectId?: string) => Promise<void>
 }
 
 function FilteredTaskList({ 
@@ -192,7 +202,8 @@ function FilteredTaskList({
   createTask,
   deleteTask,
   loading,
-  getRecentTasks
+  getRecentTasks,
+  updateMultipleTaskOrder
 }: FilteredTaskListProps) {
   if (activeTab === 'recent') {
     return (
@@ -218,6 +229,7 @@ function FilteredTaskList({
       createTask={createTask}
       deleteTask={deleteTask}
       loading={loading}
+      onTaskOrderChange={updateMultipleTaskOrder}
     />
   )
 }

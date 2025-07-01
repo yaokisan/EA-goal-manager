@@ -140,7 +140,7 @@ export function useTasks(projectId?: string) {
       : allTasks
     
     // order_indexでソート（nullの場合は末尾に）
-    return filtered.sort((a, b) => {
+    const sorted = filtered.sort((a, b) => {
       if (a.order_index === null && b.order_index === null) {
         return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       }
@@ -148,6 +148,17 @@ export function useTasks(projectId?: string) {
       if (b.order_index === null) return -1
       return a.order_index - b.order_index
     })
+    
+    // デバッグ情報を出力（プロジェクト指定時のみ）
+    if (projectId) {
+      console.log('🔍 useMemo - tasks sorted:', sorted.map(t => ({ 
+        id: t.id.slice(0,8), 
+        name: t.name.slice(0,20), 
+        order_index: t.order_index 
+      })))
+    }
+    
+    return sorted
   }, [allTasks, projectId])
 
   // タスクの並び順更新
@@ -173,20 +184,35 @@ export function useTasks(projectId?: string) {
     }
   }, [supabase, user])
 
-  // 複数タスクの並び順を一括更新
-  const updateMultipleTaskOrder = useCallback(async (updates: { id: string; order_index: number }[]) => {
+  // 複数タスクの並び順を一括更新（プロジェクト内スコープ対応）
+  const updateMultipleTaskOrder = useCallback(async (updates: { id: string; order_index: number }[], projectId?: string) => {
     if (!user) throw new Error('認証が必要です')
     
+    console.log('🔄 updateMultipleTaskOrder called:', { updates, projectId })
     
     try {
+      // プロジェクト内でのorder_index調整を先に実行
+      const adjustedUpdates = await adjustOrderIndexForProject(updates, projectId)
+      console.log('📊 調整されたupdates:', adjustedUpdates)
+      
+      // 楽観的更新: 調整されたorder_indexでローカル状態を更新
+      setAllTasks(prev => {
+        const updated = prev.map(task => {
+          const update = adjustedUpdates.find(u => u.id === task.id)
+          return update ? { ...task, order_index: update.order_index } : task
+        })
+        console.log('✅ 楽観的更新完了（調整済みorder_index使用）')
+        return updated
+      })
+      
       // バッチ更新を実行
-      const promises = updates.map(({ id, order_index }) => {
+      const promises = adjustedUpdates.map(({ id, order_index }) => {
         return supabase
           .from('tasks')
           .update({ order_index })
           .eq('id', id)
           .eq('user_id', user.id)
-          .select() // 更新されたデータを返す
+          .select()
       })
       
       const results = await Promise.all(promises)
@@ -197,20 +223,37 @@ export function useTasks(projectId?: string) {
         throw new Error(`一部のタスク更新に失敗: ${errors.length}件`)
       }
       
+      console.log('✅ データベース更新完了')
       
-      // ローカル状態を更新
-      setAllTasks(prev => {
-        const updated = prev.map(task => {
-          const update = updates.find(u => u.id === task.id)
-          return update ? { ...task, order_index: update.order_index } : task
-        })
-        return updated
-      })
+      // 楽観的更新が既に完了しているので、追加の状態更新は不要
+      
     } catch (err) {
-      console.error('複数タスク順序更新エラー:', err)
+      console.error('❌ データベース更新エラー:', err)
+      // エラー時は楽観的更新を元に戻す
+      console.log('🔄 楽観的更新をロールバック')
+      await fetchTasks()
       throw err
     }
-  }, [supabase, user])
+    
+    // プロジェクト内でのorder_index調整関数
+    async function adjustOrderIndexForProject(updates: { id: string; order_index: number }[], projectId?: string) {
+      if (!projectId) {
+        // プロジェクト指定がない場合は、グローバルでのorder_indexを使用
+        return updates
+      }
+      
+      // プロジェクトごとに固有のベース値を使用（プロジェクトIDをハッシュ化）
+      const projectHash = projectId.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)
+      const baseOrderIndex = (projectHash % 1000 + 1) * 1000 // 1000-999000の範囲
+      
+      console.log('📐 プロジェクト別order_index計算:', { projectId, projectHash, baseOrderIndex })
+      
+      return updates.map(update => ({
+        ...update,
+        order_index: baseOrderIndex + update.order_index
+      }))
+    }
+  }, [supabase, user, allTasks, fetchTasks])
 
   // タスク作成
   const createTask = useCallback(async (data: Omit<Task, 'id' | 'user_id' | 'created_at' | 'updated_at' | 'completed_at'>) => {

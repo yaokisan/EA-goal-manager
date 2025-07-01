@@ -59,8 +59,9 @@ interface GanttChartProps {
     remaining: number
     progress: number
   }
-  onTaskOrderChange?: (updates: { id: string; order_index: number }[]) => Promise<void>
+  onTaskOrderChange?: (updates: { id: string; order_index: number }[], projectId?: string) => Promise<void>
   updateTask?: (id: string, data: Partial<Task>) => Promise<void>
+  projectId?: string
 }
 
 interface GanttTask {
@@ -102,7 +103,8 @@ export default function GanttChart({
   focusMode = false,
   taskStats = { total: 0, completed: 0, remaining: 0, progress: 0 },
   onTaskOrderChange,
-  updateTask
+  updateTask,
+  projectId
 }: GanttChartProps) {
   // ドラッグ&ドロップセンサー設定
   const sensors = useSensors(
@@ -144,7 +146,7 @@ export default function GanttChart({
           order_index: index + 1
         }))
         
-        await onTaskOrderChange(updates)
+        await onTaskOrderChange(updates, projectId)
       } catch (error) {
         console.error('❌ ガントチャートタスク順序更新エラー:', error)
       }

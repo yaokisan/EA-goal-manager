@@ -52,15 +52,19 @@ export default function SortableTaskCard(props: SortableTaskCardProps) {
 
   const style = {
     transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
+    transition: isDragging ? 'none' : transition, // ドラッグ中はtransitionを無効化
+    opacity: isDragging ? 0.3 : 1, // より透明に
+    scale: isDragging ? 1.02 : 1, // ドラッグ中は少し拡大
+    zIndex: isDragging ? 1000 : 'auto', // ドラッグ中は最前面
   }
 
   return (
     <div
       ref={setNodeRef}
       style={style}
-      className={`relative group ${isDragging ? 'z-50' : ''}`}
+      className={`relative group transition-all duration-200 ${
+        isDragging ? 'z-50 shadow-2xl ring-2 ring-blue-500 ring-opacity-50 bg-white rounded-lg' : ''
+      }`}
     >
       {/* ドラッグハンドル */}
       {!props.isEditing && !props.isMultiSelectMode && (
