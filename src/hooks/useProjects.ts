@@ -50,12 +50,56 @@ export function useProjects() {
     }
   }, [supabase, user])
 
-  // 初期データ読み込み
+  // 初期データ読み込みとリアルタイム購読
   useEffect(() => {
     if (user) {
       fetchProjects()
+      
+      // リアルタイム更新の購読
+      const subscription = supabase
+        .channel('projects-changes')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'projects',
+            filter: `user_id=eq.${user.id}`
+          },
+          (payload) => {
+            console.log('プロジェクトリアルタイム更新:', payload)
+            
+            if (payload.eventType === 'INSERT') {
+              const newProject = payload.new as Project
+              
+              setProjects(prev => {
+                // 重複チェック
+                if (prev.some(project => project.id === newProject.id)) {
+                  return prev
+                }
+                return [newProject, ...prev]
+              })
+            }
+            else if (payload.eventType === 'UPDATE') {
+              const updatedProject = payload.new as Project
+              
+              setProjects(prev => prev.map(project => 
+                project.id === updatedProject.id ? updatedProject : project
+              ))
+            }
+            else if (payload.eventType === 'DELETE') {
+              setProjects(prev => prev.filter(project => project.id !== payload.old.id))
+            }
+          }
+        )
+        .subscribe()
+
+      // クリーンアップ
+      return () => {
+        subscription.unsubscribe()
+      }
     }
-  }, [user, fetchProjects])
+  }, [user, supabase])
 
   // プロジェクト作成
   const createProject = useCallback(async (data: Omit<Project, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => {

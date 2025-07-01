@@ -42,7 +42,6 @@ export function useTasks(projectId?: string) {
         .order('order_index', { ascending: true, nullsFirst: false })
         .order('created_at', { ascending: false })
       
-      console.log('📥 Fetched tasks from DB:', data?.map(t => ({ id: t.id, name: t.name, order_index: t.order_index })))
 
       if (error) throw error
       
@@ -61,13 +60,78 @@ export function useTasks(projectId?: string) {
     }
   }, [supabase, user])
 
-  // 初期データ読み込み
+  // 初期データ読み込みとリアルタイム購読
   useEffect(() => {
-    console.log('🔄 useEffect triggered - fetching tasks. User:', user?.id)
     if (user) {
       fetchTasks()
+      
+      // リアルタイム更新の購読
+      console.log('🔄 リアルタイム購読を開始:', user.id)
+      
+      const subscription = supabase
+        .channel('tasks-changes')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'tasks',
+            filter: `user_id=eq.${user.id}`
+          },
+          (payload) => {
+            console.log('🔥 リアルタイム更新受信:', payload)
+            
+            if (payload.eventType === 'INSERT') {
+              const newTask = {
+                ...payload.new,
+                assignees: payload.new.assignees || (payload.new.assignee ? [payload.new.assignee] : [])
+              } as Task
+              
+              console.log('➕ 新しいタスクを追加:', newTask)
+              
+              setAllTasks(prev => {
+                // 重複チェック
+                if (prev.some(task => task.id === newTask.id)) {
+                  console.log('⚠️ 重複タスクをスキップ:', newTask.id)
+                  return prev
+                }
+                console.log('✅ タスクを状態に追加')
+                return [newTask, ...prev]
+              })
+            }
+            else if (payload.eventType === 'UPDATE') {
+              const updatedTask = {
+                ...payload.new,
+                assignees: payload.new.assignees || (payload.new.assignee ? [payload.new.assignee] : [])
+              } as Task
+              
+              console.log('📝 タスクを更新:', updatedTask)
+              
+              setAllTasks(prev => {
+                const updated = prev.map(task => 
+                  task.id === updatedTask.id ? updatedTask : task
+                )
+                console.log('✅ タスク状態を更新完了')
+                return updated
+              })
+            }
+            else if (payload.eventType === 'DELETE') {
+              console.log('🗑️ タスクを削除:', payload.old.id)
+              
+              setAllTasks(prev => prev.filter(task => task.id !== payload.old.id))
+            }
+          }
+        )
+        .subscribe((status) => {
+          console.log('📡 購読ステータス:', status)
+        })
+
+      // クリーンアップ
+      return () => {
+        subscription.unsubscribe()
+      }
     }
-  }, [user]) // fetchTasksを依存配列から削除して無限ループを防ぐ
+  }, [user, supabase]) // fetchTasksを依存配列から削除して無限ループを防ぐ
 
   // プロジェクトでフィルタリングしたタスク（order_indexでソート）
   const tasks = useMemo(() => {
@@ -113,12 +177,10 @@ export function useTasks(projectId?: string) {
   const updateMultipleTaskOrder = useCallback(async (updates: { id: string; order_index: number }[]) => {
     if (!user) throw new Error('認証が必要です')
     
-    console.log('🔄 updateMultipleTaskOrder called with:', updates)
     
     try {
       // バッチ更新を実行
       const promises = updates.map(({ id, order_index }) => {
-        console.log(`📤 Updating task ${id} to order_index ${order_index}`)
         return supabase
           .from('tasks')
           .update({ order_index })
@@ -128,19 +190,13 @@ export function useTasks(projectId?: string) {
       })
       
       const results = await Promise.all(promises)
-      console.log('📋 Update results:', results.map(r => ({ 
-        data: r.data?.map(task => ({ id: task.id, name: task.name, order_index: task.order_index })), 
-        error: r.error 
-      })))
       
       const errors = results.filter(result => result.error).map(result => result.error)
       
       if (errors.length > 0) {
-        console.error('❌ Batch update errors:', errors)
         throw new Error(`一部のタスク更新に失敗: ${errors.length}件`)
       }
       
-      console.log('✅ Batch update successful')
       
       // ローカル状態を更新
       setAllTasks(prev => {
@@ -148,7 +204,6 @@ export function useTasks(projectId?: string) {
           const update = updates.find(u => u.id === task.id)
           return update ? { ...task, order_index: update.order_index } : task
         })
-        console.log('📝 Local state updated:', updated.map(t => ({ id: t.id, name: t.name, order_index: t.order_index })))
         return updated
       })
     } catch (err) {

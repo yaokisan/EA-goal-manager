@@ -42,6 +42,9 @@ import {
   restrictToParentElement,
 } from '@dnd-kit/modifiers'
 import SortableGanttTask from './SortableGanttTask'
+import TaskEditModal from '@/components/tasks/TaskEditModal'
+import { useTasks } from '@/hooks/useTasks'
+import { useProjects } from '@/hooks/useProjects'
 
 interface GanttChartProps {
   tasks: Task[]
@@ -57,6 +60,7 @@ interface GanttChartProps {
     progress: number
   }
   onTaskOrderChange?: (updates: { id: string; order_index: number }[]) => Promise<void>
+  updateTask?: (id: string, data: Partial<Task>) => Promise<void>
 }
 
 interface GanttTask {
@@ -97,7 +101,8 @@ export default function GanttChart({
   activeTab = 'all',
   focusMode = false,
   taskStats = { total: 0, completed: 0, remaining: 0, progress: 0 },
-  onTaskOrderChange
+  onTaskOrderChange,
+  updateTask
 }: GanttChartProps) {
   // ドラッグ&ドロップセンサー設定
   const sensors = useSensors(
@@ -109,23 +114,24 @@ export default function GanttChart({
   const [selectedTask, setSelectedTask] = useState<string | null>(null)
   const [selectedPeriod, setSelectedPeriod] = useState('2months')
   const [draggedTask, setDraggedTask] = useState<string | null>(null)
+  const [editingTask, setEditingTask] = useState<Task | null>(null)
   const { focusData } = useFocusMode()
+  const { projects: allProjects } = useProjects()
+  
+  console.log('GanttChart state - editingTask:', editingTask)
 
   // ドラッグ終了時の処理
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event
     
-    console.log('🎯 GanttChart handleDragEnd called:', { activeId: active.id, overId: over?.id })
     
     if (!over || active.id === over.id || !onTaskOrderChange) {
-      console.log('❌ No valid drop target, same position, or no handler')
       return
     }
     
     const activeIndex = ganttTasks.findIndex(task => task.id === active.id)
     const overIndex = ganttTasks.findIndex(task => task.id === over.id)
     
-    console.log('📊 GanttChart drag indices:', { activeIndex, overIndex, ganttTasksCount: ganttTasks.length })
     
     if (activeIndex !== -1 && overIndex !== -1) {
       // 新しい順序での配列を作成
@@ -138,9 +144,7 @@ export default function GanttChart({
           order_index: index + 1
         }))
         
-        console.log('🔄 Calling onTaskOrderChange from GanttChart...')
         await onTaskOrderChange(updates)
-        console.log('✅ GanttChart drag update completed')
       } catch (error) {
         console.error('❌ ガントチャートタスク順序更新エラー:', error)
       }
@@ -401,7 +405,12 @@ export default function GanttChart({
                     key={task.id}
                     task={task}
                     isSelected={selectedTask === task.id}
-                    onSelect={() => setSelectedTask(task.id === selectedTask ? null : task.id)}
+                    onSelect={() => {
+                      const originalTask = tasks.find(t => t.id === task.id)
+                      if (originalTask) {
+                        setEditingTask(originalTask)
+                      }
+                    }}
                     getAvatarColor={getAvatarColor}
                     getAvatarInitials={getAvatarInitials}
                   />
@@ -510,23 +519,31 @@ export default function GanttChart({
                     width: `${Math.max(width, 5)}%`,
                     height: '24px' // 進捗バーの高さを少し小さく
                   }}
+                  onClick={() => console.log('Parent div clicked')}
                 >
                   {/* タスクバー本体 */}
-                  <div 
-                    className={`relative h-full rounded-lg shadow-sm transition-all duration-200 cursor-grab ${
+                  <button
+                    type="button"
+                    className={`relative h-full w-full rounded-lg shadow-sm transition-all duration-200 cursor-pointer border-0 p-0 ${
                       isDragged ? 'cursor-grabbing scale-105' : ''
-                    } ${isSelected ? 'ring-2 ring-gray-400' : ''}`}
+                    } ${isSelected ? 'ring-2 ring-gray-400' : ''} hover:shadow-md`}
                     style={{ 
                       background: `linear-gradient(135deg, ${task.color} 0%, ${task.color}DD 50%, ${task.color}BB 100%)`,
-                      width: '100%'
                     }}
-                    onClick={() => setSelectedTask(task.id === selectedTask ? null : task.id)}
-                    onMouseDown={() => setDraggedTask(task.id)}
-                    onMouseUp={() => setDraggedTask(null)}
+                    onClick={(e) => {
+                      console.log('=== CLICK EVENT FIRED ===')
+                      console.log('Task:', task)
+                      console.log('Tasks array:', tasks)
+                      const originalTask = tasks.find(t => t.id === task.id)
+                      console.log('Found original task:', originalTask)
+                      if (originalTask) {
+                        setEditingTask(originalTask)
+                      }
+                    }}
                   >
                     {/* タスク名 */}
                     {width > 10 && (
-                      <div className="absolute inset-0 flex items-center px-3">
+                      <div className="absolute inset-0 flex items-center px-3 pointer-events-none">
                         <span className="text-white text-sm font-medium truncate">
                           {task.name}
                         </span>
@@ -538,20 +555,20 @@ export default function GanttChart({
                       <>
                         {/* 左ハンドル */}
                         <div 
-                          className="absolute left-0 top-1/2 transform -translate-y-1/2 w-3 h-4 bg-white rounded-sm shadow-md cursor-ew-resize opacity-90 hover:opacity-100"
+                          className="absolute left-0 top-1/2 transform -translate-y-1/2 w-3 h-4 bg-white rounded-sm shadow-md cursor-ew-resize opacity-90 hover:opacity-100 pointer-events-none"
                           style={{ left: '-6px' }}
                         />
                         
                         {/* 右ハンドル */}
                         <div 
-                          className="absolute right-0 top-1/2 transform -translate-y-1/2 w-3 h-4 bg-white rounded-sm shadow-md cursor-ew-resize opacity-90 hover:opacity-100"
+                          className="absolute right-0 top-1/2 transform -translate-y-1/2 w-3 h-4 bg-white rounded-sm shadow-md cursor-ew-resize opacity-90 hover:opacity-100 pointer-events-none"
                           style={{ right: '-6px' }}
                         />
                       </>
                     )}
 
                     {/* ホバー時のハンドル表示 */}
-                    <div className="group-hover:opacity-60 opacity-0 transition-opacity duration-200">
+                    <div className="group-hover:opacity-60 opacity-0 transition-opacity duration-200 pointer-events-none">
                       <div 
                         className="absolute left-0 top-1/2 transform -translate-y-1/2 w-3 h-4 bg-white rounded-sm shadow-md cursor-ew-resize"
                         style={{ left: '-6px' }}
@@ -561,7 +578,7 @@ export default function GanttChart({
                         style={{ right: '-6px' }}
                       />
                     </div>
-                  </div>
+                  </button>
                 </div>
               )
             })}
@@ -614,6 +631,16 @@ export default function GanttChart({
           </p>
         </div>
       )}
+
+      {/* タスク編集モーダル */}
+      <TaskEditModal
+        isOpen={editingTask !== null}
+        task={editingTask}
+        project={editingTask ? allProjects.find(p => p.id === editingTask.project_id) : undefined}
+        availableMembers={editingTask ? allProjects.find(p => p.id === editingTask.project_id)?.members || [] : []}
+        onClose={() => setEditingTask(null)}
+        onSave={updateTask || (() => Promise.resolve())}
+      />
     </div>
   )
 }

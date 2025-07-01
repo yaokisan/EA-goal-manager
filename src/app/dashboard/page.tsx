@@ -36,7 +36,18 @@ if (process.env.NODE_ENV === 'development') {
 export default function DashboardPage() {
   const [activeTab, setActiveTab] = useState('all')
   const [focusMode, setFocusMode] = useState(false)
-  const { tasks, getRecentTasks, updateMultipleTaskOrder } = useTasks()
+  // 全てのタスク操作を統一したuseTasks呼び出し
+  const { 
+    tasks, 
+    getRecentTasks, 
+    updateMultipleTaskOrder, 
+    updateTask, 
+    toggleTaskStatus, 
+    copyTasksToNotion,
+    createTask,
+    deleteTask,
+    loading
+  } = useTasks()
   const { projects } = useProjects()
 
   const getProjectIdForFilter = () => {
@@ -133,6 +144,7 @@ export default function DashboardPage() {
           focusMode={focusMode}
           taskStats={getTaskStats(getFilteredTasksForGantt(), activeTab)}
           onTaskOrderChange={updateMultipleTaskOrder}
+          updateTask={updateTask}
         />
         
         {/* タスクリスト */}
@@ -140,6 +152,14 @@ export default function DashboardPage() {
           activeTab={activeTab}
           projectId={getProjectIdForFilter()}
           title={getTaskListTitle()}
+          tasks={tasks}
+          updateTask={updateTask}
+          toggleTaskStatus={toggleTaskStatus}
+          copyTasksToNotion={copyTasksToNotion}
+          createTask={createTask}
+          deleteTask={deleteTask}
+          loading={loading}
+          getRecentTasks={getRecentTasks}
         />
       </div>
     </div>
@@ -151,12 +171,38 @@ interface FilteredTaskListProps {
   activeTab: string
   projectId?: string
   title: string
+  tasks: any[]
+  updateTask: (id: string, data: any) => Promise<void>
+  toggleTaskStatus: (id: string) => Promise<void>
+  copyTasksToNotion: (taskIds: string[]) => string
+  createTask: (data: any) => Promise<any>
+  deleteTask: (id: string) => Promise<void>
+  loading: boolean
+  getRecentTasks: () => any[]
 }
 
-function FilteredTaskList({ activeTab, projectId, title }: FilteredTaskListProps) {
+function FilteredTaskList({ 
+  activeTab, 
+  projectId, 
+  title, 
+  tasks,
+  updateTask,
+  toggleTaskStatus,
+  copyTasksToNotion,
+  createTask,
+  deleteTask,
+  loading,
+  getRecentTasks
+}: FilteredTaskListProps) {
   if (activeTab === 'recent') {
     return (
-      <RecentTaskList title={title} />
+      <RecentTaskList 
+        title={title} 
+        updateTask={updateTask}
+        toggleTaskStatus={toggleTaskStatus}
+        copyTasksToNotion={copyTasksToNotion}
+        getRecentTasks={getRecentTasks}
+      />
     )
   }
 
@@ -165,6 +211,13 @@ function FilteredTaskList({ activeTab, projectId, title }: FilteredTaskListProps
       projectId={projectId}
       title={title}
       showAddButton={true}
+      tasks={tasks}
+      updateTask={updateTask}
+      toggleTaskStatus={toggleTaskStatus}
+      copyTasksToNotion={copyTasksToNotion}
+      createTask={createTask}
+      deleteTask={deleteTask}
+      loading={loading}
     />
   )
 }
@@ -172,10 +225,19 @@ function FilteredTaskList({ activeTab, projectId, title }: FilteredTaskListProps
 // 直近1週間タスクリストコンポーネント
 interface RecentTaskListProps {
   title: string
+  updateTask: (id: string, data: any) => Promise<void>
+  toggleTaskStatus: (id: string) => Promise<void>
+  copyTasksToNotion: (taskIds: string[]) => string
+  getRecentTasks: () => any[]
 }
 
-function RecentTaskList({ title }: RecentTaskListProps) {
-  const { getRecentTasks, updateTask, toggleTaskStatus, copyTasksToNotion } = useTasks()
+function RecentTaskList({ 
+  title, 
+  updateTask, 
+  toggleTaskStatus, 
+  copyTasksToNotion, 
+  getRecentTasks 
+}: RecentTaskListProps) {
   const { projects } = useProjects()
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null)
   const [isMultiSelectMode, setIsMultiSelectMode] = useState(false)

@@ -49,15 +49,40 @@ interface TaskListProps {
   projectId?: string
   showAddButton?: boolean
   title?: string
+  tasks?: any[]
+  updateTask?: (id: string, data: any) => Promise<void>
+  toggleTaskStatus?: (id: string) => Promise<void>
+  copyTasksToNotion?: (taskIds: string[]) => string
+  createTask?: (data: any) => Promise<any>
+  deleteTask?: (id: string) => Promise<void>
+  loading?: boolean
 }
 
 export default function TaskList({ 
   projectId, 
   showAddButton = true,
-  title = 'タスクリスト'
+  title = 'タスクリスト',
+  tasks: propTasks,
+  updateTask: propUpdateTask,
+  toggleTaskStatus: propToggleTaskStatus,
+  copyTasksToNotion: propCopyTasksToNotion,
+  createTask: propCreateTask,
+  deleteTask: propDeleteTask,
+  loading: propLoading
 }: TaskListProps) {
-  const { tasks, createTask, updateTask, deleteTask, toggleTaskStatus, copyTasksToNotion, loading, updateMultipleTaskOrder } = useTasks(projectId)
+  // フォールバック用のuseTasks（propsが渡されない場合のみ使用）
+  const fallbackUseTasks = useTasks(projectId)
   const { projects } = useProjects()
+  
+  // propsから渡された値があればそれを使用、なければフォールバック
+  const tasks = propTasks ?? fallbackUseTasks.tasks
+  const createTask = propCreateTask ?? fallbackUseTasks.createTask
+  const updateTask = propUpdateTask ?? fallbackUseTasks.updateTask
+  const deleteTask = propDeleteTask ?? fallbackUseTasks.deleteTask
+  const toggleTaskStatus = propToggleTaskStatus ?? fallbackUseTasks.toggleTaskStatus
+  const copyTasksToNotion = propCopyTasksToNotion ?? fallbackUseTasks.copyTasksToNotion
+  const loading = propLoading ?? fallbackUseTasks.loading
+  const updateMultipleTaskOrder = fallbackUseTasks.updateMultipleTaskOrder
   
   // ドラッグ&ドロップセンサー設定
   const sensors = useSensors(
@@ -74,11 +99,14 @@ export default function TaskList({
   const [isAddingTask, setIsAddingTask] = useState(false)
   const [copyFeedback, setCopyFeedback] = useState<string | null>(null)
 
-  const pendingTasks = tasks.filter(task => task.status === 'pending')
-  const completedTasks = tasks.filter(task => task.status === 'completed')
+  // プロジェクト別フィルタリング処理（propsでtasksが渡された場合）
+  const filteredTasks = propTasks ? (
+    projectId ? propTasks.filter(task => task.project_id === projectId) : propTasks
+  ) : tasks
   
-  // デバッグ: タスクの順序確認
-  console.log('📋 TaskList rendering. PendingTasks order:', pendingTasks.map(t => ({ id: t.id, name: t.name, order_index: t.order_index })))
+  const pendingTasks = filteredTasks.filter(task => task.status === 'pending')
+  const completedTasks = filteredTasks.filter(task => task.status === 'completed')
+  
 
   const getProjectForTask = (task: Task): Project | undefined => {
     return projects.find(p => p.id === task.project_id)
@@ -167,17 +195,14 @@ export default function TaskList({
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event
     
-    console.log('🎯 TaskList handleDragEnd called:', { activeId: active.id, overId: over?.id })
     
     if (!over || active.id === over.id) {
-      console.log('❌ No valid drop target or same position')
       return
     }
     
     const activeIndex = pendingTasks.findIndex(task => task.id === active.id)
     const overIndex = pendingTasks.findIndex(task => task.id === over.id)
     
-    console.log('📊 Drag indices:', { activeIndex, overIndex, pendingTasksCount: pendingTasks.length })
     
     if (activeIndex !== -1 && overIndex !== -1) {
       try {
@@ -188,9 +213,7 @@ export default function TaskList({
           order_index: index + 1
         }))
         
-        console.log('🔄 Calling updateMultipleTaskOrder from TaskList with updates:', updates)
         await updateMultipleTaskOrder(updates)
-        console.log('✅ TaskList drag update completed')
       } catch (error) {
         console.error('❌ タスク順序更新エラー:', error)
         // エラー時は元に戻すか、データを再取得する
@@ -322,7 +345,7 @@ export default function TaskList({
       )}
 
       {/* 空状態 */}
-      {tasks.length === 0 && (
+      {filteredTasks.length === 0 && (
         <div className="text-center py-8 text-gray-500">
           <p>タスクがありません</p>
           {showAddButton && (
