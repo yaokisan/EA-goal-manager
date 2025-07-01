@@ -24,6 +24,7 @@ import TaskCard from '@/components/tasks/TaskCard'
 import ProjectTabs from '@/components/dashboard/ProjectTabs'
 import GanttChart from '@/components/gantt/GanttChart'
 import FocusMode from '@/components/focus/FocusMode'
+import FocusEditModal from '@/components/focus/FocusEditModal'
 import { useTasks } from '@/hooks/useTasks'
 import { useProjects } from '@/hooks/useProjects'
 import { useFocusMode } from '@/hooks/useFocusMode'
@@ -64,13 +65,17 @@ export default function DashboardPage() {
     return activeTab
   }
 
-  const { getTaskStats } = useFocusMode(getProjectIdForFilter())
+  const { focusData, getTaskStats } = useFocusMode(getProjectIdForFilter())
 
-  // フォーカスモード状態をローカルストレージから復元
+  // フォーカスモード状態を管理
   useEffect(() => {
-    const savedFocusMode = localStorage.getItem('focusMode')
-    if (savedFocusMode !== null) {
-      setFocusMode(JSON.parse(savedFocusMode))
+    // フォーカスデータが存在し、有効な目標がある場合のみフォーカスモードをオンにする
+    if (focusData && focusData.goal && focusData.goal.trim() !== '') {
+      setFocusMode(true)
+      localStorage.setItem('focusMode', JSON.stringify(true))
+    } else {
+      setFocusMode(false)
+      localStorage.setItem('focusMode', JSON.stringify(false))
     }
     
     // アクティブタブの状態をローカルストレージから復元
@@ -78,14 +83,23 @@ export default function DashboardPage() {
     if (savedActiveTab) {
       setActiveTab(savedActiveTab)
     }
-  }, [])
+  }, [focusData])
 
-  // フォーカスモード状態の変更をローカルストレージに保存
+  // フォーカスモードトグル処理
   const handleFocusModeToggle = () => {
-    const newFocusMode = !focusMode
-    setFocusMode(newFocusMode)
-    localStorage.setItem('focusMode', JSON.stringify(newFocusMode))
+    if (!focusData || !focusData.goal || focusData.goal.trim() === '') {
+      // フォーカスデータがない場合は編集モーダルを表示
+      setShowFocusEditor(true)
+    } else {
+      // フォーカスデータがある場合は通常のトグル
+      const newFocusMode = !focusMode
+      setFocusMode(newFocusMode)
+      localStorage.setItem('focusMode', JSON.stringify(newFocusMode))
+    }
   }
+
+  // フォーカスモード編集モーダルの状態
+  const [showFocusEditor, setShowFocusEditor] = useState(false)
 
   // タブ変更時にローカルストレージに保存
   const handleTabChange = (tabId: string) => {
@@ -173,6 +187,17 @@ export default function DashboardPage() {
           updateMultipleTaskOrder={updateMultipleTaskOrder}
         />
       </div>
+
+      {/* フォーカスモード編集モーダル */}
+      <FocusEditModal
+        isOpen={showFocusEditor}
+        onClose={() => setShowFocusEditor(false)}
+        onSave={() => {
+          // 保存成功時にフォーカスモードをオンにする
+          setFocusMode(true)
+          localStorage.setItem('focusMode', JSON.stringify(true))
+        }}
+      />
     </div>
   )
 }

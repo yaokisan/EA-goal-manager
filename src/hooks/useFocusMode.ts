@@ -161,12 +161,7 @@ export function useFocusMode(projectId?: string) {
 
   // フォーカス目標新規作成
   const createFocusData = useCallback(async (data: Partial<Omit<FocusData, 'id' | 'user_id' | 'created_at'>>) => {
-    console.log('=== createFocusData called ===')
-    console.log('データ:', data)
-    console.log('認証状態 - user:', user?.id)
-    
     if (!user) {
-      console.log('ユーザー未認証のため作成をスキップ')
       return
     }
 
@@ -180,19 +175,15 @@ export function useFocusMode(projectId?: string) {
         user_id: user.id,
         project_id: projectId || null
       }
-      console.log('新規作成データ:', newFocusData)
       
       const { data: createdData, error: createError } = await supabase
         .from('focus_modes')
         .insert(newFocusData)
         .select()
         .single()
-
-      console.log('新規作成結果:', { createdData, createError })
       
       if (createError) throw createError
       setFocusData(createdData)
-      console.log('新規フォーカスデータ作成完了:', createdData)
     } catch (err) {
       console.error('フォーカス目標作成エラー:', err)
       setError('フォーカス目標の作成に失敗しました')
@@ -203,13 +194,7 @@ export function useFocusMode(projectId?: string) {
 
   // フォーカス目標更新
   const updateFocusData = useCallback(async (data: Partial<Omit<FocusData, 'id' | 'user_id' | 'created_at'>>) => {
-    console.log('=== updateFocusData called ===')
-    console.log('データ:', data)
-    console.log('現在のfocusData:', focusData)
-    console.log('認証状態 - user:', user?.id)
-    
     if (!focusData) {
-      console.log('focusDataがnullのため更新をスキップ')
       return
     }
 
@@ -221,51 +206,37 @@ export function useFocusMode(projectId?: string) {
         ...data,
         updated_at: new Date().toISOString()
       }
-      console.log('更新データ:', updateData)
 
       // 認証されていない場合のみローカル更新
       if (!user || focusData.id === 'temp-id') {
-        console.log('ローカル更新モード（認証なし）')
         const updatedData = {
           ...focusData,
           ...updateData
         }
         setFocusData(updatedData)
-        // ローカルストレージに保存
         localStorage.setItem('focusData', JSON.stringify(updatedData))
-        console.log('ローカルストレージに保存完了:', updatedData)
         return
       }
 
       // error-fallbackの場合は新規作成を試行
       if (focusData.id === 'error-fallback') {
-        console.log('error-fallbackの場合は新規作成を試行')
         const newFocusData = {
           ...defaultFocusData,
           ...updateData,
           user_id: user.id,
           project_id: projectId || null
         }
-        console.log('新規作成データ:', newFocusData)
         
         const { data: createdData, error: createError } = await supabase
           .from('focus_modes')
           .insert(newFocusData)
           .select()
           .single()
-
-        console.log('新規作成結果:', { createdData, createError })
         
         if (createError) throw createError
         setFocusData(createdData)
-        console.log('新規フォーカスデータ作成完了:', createdData)
         return
       }
-
-      console.log('Supabaseに更新リクエスト送信中...')
-      console.log('更新対象ID:', focusData.id)
-      console.log('ユーザーID:', user.id)
-      console.log('送信するupdateData:', updateData)
       
       const { data: updatedData, error } = await supabase
         .from('focus_modes')
@@ -274,16 +245,9 @@ export function useFocusMode(projectId?: string) {
         .eq('user_id', user.id)
         .select()
         .single()
-
-      console.log('Supabaseレスポンス:', { updatedData, error })
       
-      if (error) {
-        console.error('Supabaseエラーの詳細:', error)
-        throw error
-      }
-      
+      if (error) throw error
       setFocusData(updatedData)
-      console.log('フォーカスデータ更新完了:', updatedData)
     } catch (err) {
       console.error('フォーカス目標更新エラー:', err)
       setError('フォーカス目標の更新に失敗しました')
@@ -294,7 +258,6 @@ export function useFocusMode(projectId?: string) {
         updated_at: new Date().toISOString()
       }
       setFocusData(fallbackData)
-      console.log('エラー時のローカル更新:', fallbackData)
     } finally {
       setLoading(false)
     }

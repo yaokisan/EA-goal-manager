@@ -68,12 +68,9 @@ export default function FocusMode({ isVisible, onClose }: FocusModeProps) {
     )
   }
   
-  // 初回時（focusDataがnull）の場合は編集モードを自動表示
-  const shouldShowEditor = !focusData || !focusData.goal || focusData.goal.trim() === ''
-
-  if (shouldShowEditor && !isEditing) {
-    // 初回時は自動的に編集モードに入る
-    setIsEditing(true)
+  // focusDataが存在しない、または有効な目標がない場合は何も表示しない
+  if (!focusData || !focusData.goal || focusData.goal.trim() === '') {
+    return null
   }
 
   const getUrgencyColor = () => {
