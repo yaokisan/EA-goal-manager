@@ -30,12 +30,15 @@ interface GanttTask {
   projectName: string
   avatar: string
   project: any
+  status?: string
 }
 
 interface SortableGanttTaskProps {
   task: GanttTask
   isSelected: boolean
   onSelect: () => void
+  onToggleStatus?: () => void
+  onDelete?: () => void
   getAvatarColor: (name: string) => string
   getAvatarInitials: (name: string) => string
 }
@@ -44,6 +47,8 @@ export default function SortableGanttTask({
   task,
   isSelected,
   onSelect,
+  onToggleStatus,
+  onDelete,
   getAvatarColor,
   getAvatarInitials
 }: SortableGanttTaskProps) {
@@ -69,7 +74,14 @@ export default function SortableGanttTask({
       className={`relative group hover:bg-white transition-colors cursor-pointer ${
         isSelected ? 'bg-blue-50 border-r-4 border-blue-500' : ''
       } ${isDragging ? 'z-50' : ''}`}
-      onClick={onSelect}
+      onClick={(e) => {
+        // チェックボックスクリック時はモーダルを開かない
+        if ((e.target as HTMLInputElement).type === 'checkbox' || 
+            (e.target as HTMLElement).closest('input[type="checkbox"]')) {
+          return
+        }
+        onSelect()
+      }}
     >
       {/* ドラッグハンドル */}
       <div
@@ -96,6 +108,19 @@ export default function SortableGanttTask({
         style={{ height: '48px' }} // 進捗バーの高さ24px + 余白24px
       >
         <div className="flex items-center space-x-3 h-full px-4">
+          {/* チェックボックス */}
+          {onToggleStatus && (
+            <input
+              type="checkbox"
+              checked={task.status === 'completed'}
+              onChange={(e) => {
+                e.stopPropagation()
+                onToggleStatus()
+              }}
+              className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded flex-shrink-0"
+            />
+          )}
+          
           {/* アバター */}
           <div 
             className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
@@ -106,11 +131,29 @@ export default function SortableGanttTask({
           
           {/* タスク情報 */}
           <div className="flex-1 min-w-0">
-            <h4 className="font-medium text-gray-900 truncate text-sm">{task.name}</h4>
+            <h4 className={`font-medium truncate text-sm ${task.status === 'completed' ? 'line-through text-gray-500' : 'text-gray-900'}`}>
+              {task.name}
+            </h4>
             <p className="text-xs text-gray-500">
               {task.assignees && task.assignees.length > 0 ? task.assignees.join(', ') : '未割当'} • {Math.ceil((task.endDate.getTime() - task.startDate.getTime()) / (1000 * 60 * 60 * 24))}日間
             </p>
           </div>
+          
+          {/* 削除ボタン */}
+          {onDelete && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                if (confirm('このタスクを削除しますか？')) {
+                  onDelete()
+                }
+              }}
+              className="text-gray-400 hover:text-red-600 transition-colors p-1 flex-shrink-0"
+              title="タスクを削除"
+            >
+              🗑️
+            </button>
+          )}
         </div>
       </div>
     </div>

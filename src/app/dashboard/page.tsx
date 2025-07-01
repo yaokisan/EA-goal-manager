@@ -152,6 +152,8 @@ export default function DashboardPage() {
           taskStats={getTaskStats(getFilteredTasksForGantt(), activeTab)}
           onTaskOrderChange={(updates, projectId) => updateMultipleTaskOrder(updates, projectId)}
           updateTask={updateTask}
+          toggleTaskStatus={toggleTaskStatus}
+          deleteTask={deleteTask}
           projectId={getCurrentProjectId()}
         />
         

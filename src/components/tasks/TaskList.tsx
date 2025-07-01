@@ -360,6 +360,7 @@ export default function TaskList({
                 onToggleStatus={() => toggleTaskStatus(task.id)}
                 onSelect={() => handleSelectTask(task.id)}
                 onCopy={() => handleCopyTask(task.id)}
+                onDelete={() => deleteTask(task.id)}
                 isMultiSelectMode={isMultiSelectMode}
               />
             ))}
@@ -390,6 +391,7 @@ export default function TaskList({
                   availableMembers={getAvailableMembersForTask(task)}
                   onToggleStatus={() => toggleTaskStatus(task.id)}
                   onCopy={() => handleCopyTask(task.id)}
+                  onDelete={() => deleteTask(task.id)}
                 />
               ))}
             </div>

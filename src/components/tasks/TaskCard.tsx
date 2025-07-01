@@ -34,6 +34,7 @@ interface TaskCardProps {
   onToggleStatus?: () => void
   onSelect?: () => void
   onCopy?: () => void
+  onDelete?: () => void
 }
 
 export default function TaskCard({
@@ -49,6 +50,7 @@ export default function TaskCard({
   onToggleStatus,
   onSelect,
   onCopy,
+  onDelete,
 }: TaskCardProps) {
   const editFormRef = useRef<HTMLDivElement>(null)
   const [editData, setEditData] = useState({
@@ -291,17 +293,36 @@ export default function TaskCard({
           </div>
         </div>
         
-        {/* コピーボタン */}
-        <button
-          onClick={(e) => {
-            e.stopPropagation()
-            onCopy?.()
-          }}
-          className="text-gray-400 hover:text-gray-600 transition-colors"
-          title="Notion形式でコピー"
-        >
-          📋
-        </button>
+        {/* アクションボタン */}
+        <div className="flex items-center space-x-1">
+          {/* コピーボタン */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              onCopy?.()
+            }}
+            className="text-gray-400 hover:text-gray-600 transition-colors p-1"
+            title="Notion形式でコピー"
+          >
+            📋
+          </button>
+          
+          {/* 削除ボタン */}
+          {onDelete && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                if (confirm('このタスクを削除しますか？')) {
+                  onDelete()
+                }
+              }}
+              className="text-gray-400 hover:text-red-600 transition-colors p-1"
+              title="タスクを削除"
+            >
+              🗑️
+            </button>
+          )}
+        </div>
       </div>
     </div>
   )

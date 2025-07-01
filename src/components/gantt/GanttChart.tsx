@@ -61,6 +61,8 @@ interface GanttChartProps {
   }
   onTaskOrderChange?: (updates: { id: string; order_index: number }[], projectId?: string) => Promise<void>
   updateTask?: (id: string, data: Partial<Task>) => Promise<void>
+  toggleTaskStatus?: (id: string) => Promise<void>
+  deleteTask?: (id: string) => Promise<void>
   projectId?: string
 }
 
@@ -74,6 +76,7 @@ interface GanttTask {
   projectName: string
   avatar: string
   project: Project
+  status: string
 }
 
 // 期間選択のオプション
@@ -104,6 +107,8 @@ export default function GanttChart({
   taskStats = { total: 0, completed: 0, remaining: 0, progress: 0 },
   onTaskOrderChange,
   updateTask,
+  toggleTaskStatus,
+  deleteTask,
   projectId
 }: GanttChartProps) {
   // ドラッグ&ドロップセンサー設定
@@ -173,7 +178,8 @@ export default function GanttChart({
         color: project?.color || '#6B7280',
         projectName: project?.name || 'Unknown',
         avatar: task.assignees && task.assignees.length > 0 ? task.assignees[0] : '未割当',
-        project: project!
+        project: project!,
+        status: task.status
       }
     })
   }, [tasks, projects])
@@ -193,26 +199,27 @@ export default function GanttChart({
       resultMaxDate = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 6)
     }
     else if (focusMode && focusData?.deadline) {
-      // フォーカスモードの場合、今日から期限までの期間を表示
+      // フォーカスモードの場合、1週間前から期限までの期間を表示
       const deadline = new Date(focusData.deadline)
       const deadlineDate = new Date(deadline.getFullYear(), deadline.getMonth(), deadline.getDate())
       
-      // 1ヶ月前まで遡れるように開始日を調整（タイムゾーン対応）
-      resultMinDate = new Date(today.getFullYear(), today.getMonth() - 1, today.getDate())
+      // 1週間前から開始（通常モードと同じ）
+      resultMinDate = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 7)
       resultMaxDate = deadlineDate
     }
     else {
       // 通常モード：選択された期間
       const selectedOption = PERIOD_OPTIONS.find(opt => opt.value === selectedPeriod)
-      if (selectedOption && selectedOption.days > 0) {
-        // 1ヶ月前から選択期間後まで
-        resultMinDate = new Date(today.getFullYear(), today.getMonth() - 1, today.getDate())
+      
+      if (selectedOption && selectedOption.value !== 'custom') {
+        // 通常の期間選択（1ヶ月、2ヶ月、3ヶ月）- 常に1週間前から開始
+        resultMinDate = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 7)
         resultMaxDate = new Date(today.getFullYear(), today.getMonth(), today.getDate() + selectedOption.days)
       }
       else {
-        // カスタムモード：タスクの期間に基づく（1ヶ月前〜タスク終了後まで）
+        // カスタムモード：タスクの期間に基づく（1週間前〜タスク終了後まで、必要に応じて1ヶ月前まで拡張）
         if (ganttTasks.length === 0) {
-          resultMinDate = new Date(today.getFullYear(), today.getMonth() - 1, today.getDate())
+          resultMinDate = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 7)
           resultMaxDate = new Date(today.getFullYear(), today.getMonth() + 2, today.getDate())
         }
         else {
@@ -220,11 +227,15 @@ export default function GanttChart({
           const taskMinDate = new Date(Math.min(...allDates.map(d => d.getTime())))
           const taskMaxDate = new Date(Math.max(...allDates.map(d => d.getTime())))
           
-          // 1ヶ月前から、タスクまたは今日の2ヶ月後まで  
+          // 1週間前から開始、必要に応じて1ヶ月前まで拡張
+          const oneWeekBefore = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 7)
           const oneMonthBefore = new Date(today.getFullYear(), today.getMonth() - 1, today.getDate())
           const twoMonthsAfter = new Date(today.getFullYear(), today.getMonth() + 2, today.getDate())
           
-          const minTime = Math.min(oneMonthBefore.getTime(), taskMinDate.getTime() - 7 * 24 * 60 * 60 * 1000)
+          // カスタムモードでは必要に応じて1ヶ月前まで拡張
+          const minTime = taskMinDate.getTime() < oneWeekBefore.getTime() 
+            ? Math.min(oneMonthBefore.getTime(), taskMinDate.getTime() - 7 * 24 * 60 * 60 * 1000)
+            : oneWeekBefore.getTime()
           const maxTime = Math.max(taskMaxDate.getTime() + 7 * 24 * 60 * 60 * 1000, twoMonthsAfter.getTime())
           
           resultMinDate = new Date(minTime)
@@ -413,6 +424,8 @@ export default function GanttChart({
                         setEditingTask(originalTask)
                       }
                     }}
+                    onToggleStatus={toggleTaskStatus ? () => toggleTaskStatus(task.id) : undefined}
+                    onDelete={deleteTask ? () => deleteTask(task.id) : undefined}
                     getAvatarColor={getAvatarColor}
                     getAvatarInitials={getAvatarInitials}
                   />
@@ -475,7 +488,7 @@ export default function GanttChart({
                 className="absolute top-0 bottom-0 w-0.5 bg-red-500 z-10"
                 style={{ left: `${todayPercent}%` }}
               >
-                <div className="absolute -top-6 -left-6 bg-red-500 text-white text-xs px-2 py-1 rounded">
+                <div className="absolute -top-12 -left-4 bg-red-500 text-white text-xs px-1 py-0.5 rounded whitespace-nowrap" style={{ fontSize: '10px' }}>
                   今日
                 </div>
               </div>
@@ -528,9 +541,13 @@ export default function GanttChart({
                     type="button"
                     className={`relative h-full w-full rounded-lg shadow-sm transition-all duration-200 cursor-pointer border-0 p-0 ${
                       isDragged ? 'cursor-grabbing scale-105' : ''
-                    } ${isSelected ? 'ring-2 ring-gray-400' : ''} hover:shadow-md`}
+                    } ${isSelected ? 'ring-2 ring-gray-400' : ''} hover:shadow-md ${
+                      task.status === 'completed' ? 'opacity-60' : ''
+                    }`}
                     style={{ 
-                      background: `linear-gradient(135deg, ${task.color} 0%, ${task.color}DD 50%, ${task.color}BB 100%)`,
+                      background: task.status === 'completed' 
+                        ? `linear-gradient(135deg, #9CA3AF 0%, #9CA3AFDD 50%, #9CA3AFBB 100%)` // 完了タスクは灰色
+                        : `linear-gradient(135deg, ${task.color} 0%, ${task.color}DD 50%, ${task.color}BB 100%)`,
                     }}
                     onClick={(e) => {
                       console.log('=== CLICK EVENT FIRED ===')
@@ -546,7 +563,9 @@ export default function GanttChart({
                     {/* タスク名 */}
                     {width > 10 && (
                       <div className="absolute inset-0 flex items-center px-3 pointer-events-none">
-                        <span className="text-white text-sm font-medium truncate">
+                        <span className={`text-white text-sm font-medium truncate ${
+                          task.status === 'completed' ? 'line-through' : ''
+                        }`}>
                           {task.name}
                         </span>
                       </div>

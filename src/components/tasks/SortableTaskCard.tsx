@@ -34,6 +34,7 @@ interface SortableTaskCardProps {
   onToggleStatus?: () => void
   onSelect?: () => void
   onCopy?: () => void
+  onDelete?: () => void
   isMultiSelectMode?: boolean
 }
 
