@@ -19,7 +19,7 @@
 
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { Task, Project } from '@/types'
 import { useFocusMode } from '@/hooks/useFocusMode'
 import {
@@ -122,10 +122,116 @@ export default function GanttChart({
   const [selectedPeriod, setSelectedPeriod] = useState('2months')
   const [draggedTask, setDraggedTask] = useState<string | null>(null)
   const [editingTask, setEditingTask] = useState<Task | null>(null)
+  
+  // ガントチャート編集用の状態
+  const [isDraggingGantt, setIsDraggingGantt] = useState(false)
+  const [dragType, setDragType] = useState<'move' | 'resize-start' | 'resize-end' | null>(null)
+  const [dragStartX, setDragStartX] = useState(0)
+  const [dragStartDate, setDragStartDate] = useState<Date | null>(null)
+  const [dragEndDate, setDragEndDate] = useState<Date | null>(null)
   const { focusData } = useFocusMode()
   const { projects: allProjects } = useProjects()
   
-  console.log('GanttChart state - editingTask:', editingTask)
+
+  // X座標から日付を計算する関数
+  const xToDate = (x: number, containerWidth: number) => {
+    const percent = (x / containerWidth) * 100
+    const daysDiff = (percent / 100) * actualTotalDays - 0.5 // 0.5はセンターオフセット
+    const resultDate = new Date(minDate.getTime() + daysDiff * 24 * 60 * 60 * 1000)
+    // 日付のみに正規化
+    return new Date(resultDate.getFullYear(), resultDate.getMonth(), resultDate.getDate())
+  }
+
+  // ガントチャートドラッグ開始
+  const handleGanttDragStart = (e: React.MouseEvent, taskId: string, type: 'move' | 'resize-start' | 'resize-end') => {
+    e.stopPropagation()
+    e.preventDefault()
+    
+    setIsDraggingGantt(true)
+    setDraggedTask(taskId)
+    setDragType(type)
+    setDragStartX(e.clientX)
+    
+    const task = tasks.find(t => t.id === taskId)
+    if (task) {
+      setDragStartDate(new Date(task.start_date))
+      setDragEndDate(new Date(task.end_date))
+    }
+  }
+
+  // ガントチャートドラッグ中
+  const handleGanttDragMove = (e: React.MouseEvent) => {
+    if (!isDraggingGantt || !draggedTask) return
+    
+    e.preventDefault()
+    
+    const container = e.currentTarget as HTMLElement
+    const rect = container.getBoundingClientRect()
+    const deltaX = e.clientX - dragStartX
+    const containerWidth = rect.width
+    const daysDelta = Math.round((deltaX / containerWidth) * actualTotalDays)
+    
+    const originalTask = tasks.find(t => t.id === draggedTask)
+    if (!originalTask) return
+    
+    const originalStartDate = new Date(originalTask.start_date)
+    const originalEndDate = new Date(originalTask.end_date)
+    
+    if (dragType === 'move') {
+      // タスク全体を移動
+      const newStartDate = new Date(originalStartDate.getTime() + daysDelta * 24 * 60 * 60 * 1000)
+      const newEndDate = new Date(originalEndDate.getTime() + daysDelta * 24 * 60 * 60 * 1000)
+      
+      setDragStartDate(newStartDate)
+      setDragEndDate(newEndDate)
+    } else if (dragType === 'resize-start') {
+      // 開始日のみ変更
+      const newStartDate = new Date(originalStartDate.getTime() + daysDelta * 24 * 60 * 60 * 1000)
+      if (newStartDate < originalEndDate) {
+        setDragStartDate(newStartDate)
+        setDragEndDate(originalEndDate)
+      }
+    } else if (dragType === 'resize-end') {
+      // 終了日のみ変更
+      const newEndDate = new Date(originalEndDate.getTime() + daysDelta * 24 * 60 * 60 * 1000)
+      if (newEndDate > originalStartDate) {
+        setDragStartDate(originalStartDate)
+        setDragEndDate(newEndDate)
+      }
+    }
+  }
+
+  // ガントチャートドラッグ終了
+  const handleGanttDragEnd = async () => {
+    if (!isDraggingGantt || !draggedTask || !dragStartDate || !dragEndDate || !updateTask) {
+      resetDragState()
+      return
+    }
+
+    try {
+      const startDateStr = dragStartDate.toISOString().split('T')[0]
+      const endDateStr = dragEndDate.toISOString().split('T')[0]
+      
+      await updateTask(draggedTask, {
+        start_date: startDateStr,
+        end_date: endDateStr
+      })
+    } catch (error) {
+      console.error('ガントチャート編集エラー:', error)
+    }
+
+    resetDragState()
+  }
+
+  // ドラッグ状態をリセット
+  const resetDragState = () => {
+    setIsDraggingGantt(false)
+    setDraggedTask(null)
+    setDragType(null)
+    setDragStartX(0)
+    setDragStartDate(null)
+    setDragEndDate(null)
+  }
 
   // ドラッグ終了時の処理
   const handleDragEnd = async (event: DragEndEvent) => {
@@ -330,7 +436,63 @@ export default function GanttChart({
   const todayForCalc = new Date(now.getFullYear(), now.getMonth(), now.getDate())
   const todayPercent = dateToPercent(todayForCalc)
   
-  
+  // グローバルマウスイベントリスナー（actualTotalDays定義後）
+  useEffect(() => {
+    const handleGlobalMouseMove = (e: MouseEvent) => {
+      if (isDraggingGantt) {
+        // コンテナを見つけてhandleGanttDragMoveを呼び出す
+        const container = document.querySelector('[data-gantt-container]')
+        if (container) {
+          const rect = container.getBoundingClientRect()
+          const deltaX = e.clientX - dragStartX
+          const containerWidth = rect.width
+          const daysDelta = Math.round((deltaX / containerWidth) * actualTotalDays)
+          
+          
+          const originalTask = tasks.find(t => t.id === draggedTask)
+          if (!originalTask) return
+          
+          const originalStartDate = new Date(originalTask.start_date)
+          const originalEndDate = new Date(originalTask.end_date)
+          
+          if (dragType === 'move') {
+            const newStartDate = new Date(originalStartDate.getTime() + daysDelta * 24 * 60 * 60 * 1000)
+            const newEndDate = new Date(originalEndDate.getTime() + daysDelta * 24 * 60 * 60 * 1000)
+            setDragStartDate(newStartDate)
+            setDragEndDate(newEndDate)
+          } else if (dragType === 'resize-start') {
+            const newStartDate = new Date(originalStartDate.getTime() + daysDelta * 24 * 60 * 60 * 1000)
+            if (newStartDate < originalEndDate) {
+              setDragStartDate(newStartDate)
+              setDragEndDate(originalEndDate)
+            }
+          } else if (dragType === 'resize-end') {
+            const newEndDate = new Date(originalEndDate.getTime() + daysDelta * 24 * 60 * 60 * 1000)
+            if (newEndDate > originalStartDate) {
+              setDragStartDate(originalStartDate)
+              setDragEndDate(newEndDate)
+            }
+          }
+        }
+      }
+    }
+
+    const handleGlobalMouseUp = () => {
+      if (isDraggingGantt) {
+        handleGanttDragEnd()
+      }
+    }
+
+    if (isDraggingGantt) {
+      document.addEventListener('mousemove', handleGlobalMouseMove)
+      document.addEventListener('mouseup', handleGlobalMouseUp)
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleGlobalMouseMove)
+      document.removeEventListener('mouseup', handleGlobalMouseUp)
+    }
+  }, [isDraggingGantt, dragStartX, dragType, draggedTask, tasks, actualTotalDays])
 
   // プロジェクト別の凡例
   const projectsInUse = Array.from(new Set(ganttTasks.map(task => task.project)))
@@ -481,6 +643,10 @@ export default function GanttChart({
           <div 
             className="relative" 
             style={{ minWidth: `${actualTotalDays * 30}px`, minHeight: `${ganttTasks.length * 48}px` }}
+            data-gantt-container
+            onMouseMove={handleGanttDragMove}
+            onMouseUp={handleGanttDragEnd}
+            onMouseLeave={handleGanttDragEnd}
           >
             {/* 今日の線 */}
             {todayPercent >= 0 && todayPercent <= 100 && (
@@ -518,8 +684,16 @@ export default function GanttChart({
 
             {/* タスクバー */}
             {ganttTasks.map((task, index) => {
-              const startPercent = dateToPercent(task.startDate)
-              const endPercent = dateToPercent(task.endDate)
+              // ドラッグ中の一時的な日付を使用
+              const currentStartDate = (isDraggingGantt && draggedTask === task.id && dragStartDate) 
+                ? dragStartDate 
+                : task.startDate
+              const currentEndDate = (isDraggingGantt && draggedTask === task.id && dragEndDate) 
+                ? dragEndDate 
+                : task.endDate
+
+              const startPercent = dateToPercent(currentStartDate)
+              const endPercent = dateToPercent(currentEndDate)
               const width = endPercent - startPercent
               const isSelected = selectedTask === task.id
               const isDragged = draggedTask === task.id
@@ -534,13 +708,11 @@ export default function GanttChart({
                     width: `${Math.max(width, 5)}%`,
                     height: '24px' // 進捗バーの高さを少し小さく
                   }}
-                  onClick={() => console.log('Parent div clicked')}
                 >
                   {/* タスクバー本体 */}
-                  <button
-                    type="button"
-                    className={`relative h-full w-full rounded-lg shadow-sm transition-all duration-200 cursor-pointer border-0 p-0 ${
-                      isDragged ? 'cursor-grabbing scale-105' : ''
+                  <div
+                    className={`relative h-full w-full rounded-lg shadow-sm transition-all duration-200 select-none ${
+                      isDragged || (isDraggingGantt && draggedTask === task.id) ? 'cursor-grabbing scale-105 shadow-xl ring-2 ring-blue-400' : 'cursor-move'
                     } ${isSelected ? 'ring-2 ring-gray-400' : ''} hover:shadow-md ${
                       task.status === 'completed' ? 'opacity-60' : ''
                     }`}
@@ -549,14 +721,22 @@ export default function GanttChart({
                         ? `linear-gradient(135deg, #9CA3AF 0%, #9CA3AFDD 50%, #9CA3AFBB 100%)` // 完了タスクは灰色
                         : `linear-gradient(135deg, ${task.color} 0%, ${task.color}DD 50%, ${task.color}BB 100%)`,
                     }}
+                    onMouseDown={(e) => {
+                      // 左クリックでドラッグ開始
+                      if (e.button === 0) { // 左クリック
+                        e.preventDefault()
+                        setSelectedTask(task.id) // タスクを選択状態にする
+                        handleGanttDragStart(e, task.id, 'move')
+                      }
+                    }}
                     onClick={(e) => {
-                      console.log('=== CLICK EVENT FIRED ===')
-                      console.log('Task:', task)
-                      console.log('Tasks array:', tasks)
-                      const originalTask = tasks.find(t => t.id === task.id)
-                      console.log('Found original task:', originalTask)
-                      if (originalTask) {
-                        setEditingTask(originalTask)
+                      // ドラッグしていない場合のみモーダルを開く
+                      if (!isDraggingGantt) {
+                        const originalTask = tasks.find(t => t.id === task.id)
+                        if (originalTask) {
+                          setSelectedTask(task.id) // タスクを選択状態にする
+                          setEditingTask(originalTask)
+                        }
                       }
                     }}
                   >
@@ -571,35 +751,56 @@ export default function GanttChart({
                       </div>
                     )}
 
-                    {/* ドラッグハンドル（選択時またはホバー時） */}
-                    {(isSelected || isDragged) && (
-                      <>
-                        {/* 左ハンドル */}
-                        <div 
-                          className="absolute left-0 top-1/2 transform -translate-y-1/2 w-3 h-4 bg-white rounded-sm shadow-md cursor-ew-resize opacity-90 hover:opacity-100 pointer-events-none"
-                          style={{ left: '-6px' }}
-                        />
-                        
-                        {/* 右ハンドル */}
-                        <div 
-                          className="absolute right-0 top-1/2 transform -translate-y-1/2 w-3 h-4 bg-white rounded-sm shadow-md cursor-ew-resize opacity-90 hover:opacity-100 pointer-events-none"
-                          style={{ right: '-6px' }}
-                        />
-                      </>
+                    {/* ドラッグ中の日付フィードバック */}
+                    {isDraggingGantt && draggedTask === task.id && dragStartDate && dragEndDate && (
+                      <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded whitespace-nowrap z-20">
+                        {dragStartDate.toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric' })} 〜 {dragEndDate.toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric' })}
+                      </div>
                     )}
 
-                    {/* ホバー時のハンドル表示 */}
-                    <div className="group-hover:opacity-60 opacity-0 transition-opacity duration-200 pointer-events-none">
+                    {/* リサイズハンドル */}
+                    <>
+                      {/* 左ハンドル - より大きなヒット領域とスタイリング */}
                       <div 
-                        className="absolute left-0 top-1/2 transform -translate-y-1/2 w-3 h-4 bg-white rounded-sm shadow-md cursor-ew-resize"
-                        style={{ left: '-6px' }}
-                      />
+                        className={`absolute top-0 bottom-0 flex items-center justify-center cursor-ew-resize transition-all duration-200 ${
+                          isSelected || isDragged 
+                            ? 'opacity-100' 
+                            : 'opacity-0 group-hover:opacity-100'
+                        }`}
+                        style={{ 
+                          left: '-8px', 
+                          width: '16px' // より大きなクリック領域
+                        }}
+                        onMouseDown={(e) => {
+                          e.stopPropagation()
+                          setSelectedTask(task.id) // タスクを選択状態にする
+                          handleGanttDragStart(e, task.id, 'resize-start')
+                        }}
+                      >
+                        <div className="w-1 h-6 bg-white rounded-full shadow-lg border border-gray-300 hover:bg-gray-50 transition-colors" />
+                      </div>
+                      
+                      {/* 右ハンドル - より大きなヒット領域とスタイリング */}
                       <div 
-                        className="absolute right-0 top-1/2 transform -translate-y-1/2 w-3 h-4 bg-white rounded-sm shadow-md cursor-ew-resize"
-                        style={{ right: '-6px' }}
-                      />
-                    </div>
-                  </button>
+                        className={`absolute top-0 bottom-0 flex items-center justify-center cursor-ew-resize transition-all duration-200 ${
+                          isSelected || isDragged 
+                            ? 'opacity-100' 
+                            : 'opacity-0 group-hover:opacity-100'
+                        }`}
+                        style={{ 
+                          right: '-8px', 
+                          width: '16px' // より大きなクリック領域
+                        }}
+                        onMouseDown={(e) => {
+                          e.stopPropagation()
+                          setSelectedTask(task.id) // タスクを選択状態にする
+                          handleGanttDragStart(e, task.id, 'resize-end')
+                        }}
+                      >
+                        <div className="w-1 h-6 bg-white rounded-full shadow-lg border border-gray-300 hover:bg-gray-50 transition-colors" />
+                      </div>
+                    </>
+                  </div>
                 </div>
               )
             })}
