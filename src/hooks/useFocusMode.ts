@@ -159,6 +159,48 @@ export function useFocusMode(projectId?: string) {
     }
   }, [focusData, user])
 
+  // フォーカス目標新規作成
+  const createFocusData = useCallback(async (data: Partial<Omit<FocusData, 'id' | 'user_id' | 'created_at'>>) => {
+    console.log('=== createFocusData called ===')
+    console.log('データ:', data)
+    console.log('認証状態 - user:', user?.id)
+    
+    if (!user) {
+      console.log('ユーザー未認証のため作成をスキップ')
+      return
+    }
+
+    setLoading(true)
+    setError(null)
+    
+    try {
+      const newFocusData = {
+        ...defaultFocusData,
+        ...data,
+        user_id: user.id,
+        project_id: projectId || null
+      }
+      console.log('新規作成データ:', newFocusData)
+      
+      const { data: createdData, error: createError } = await supabase
+        .from('focus_modes')
+        .insert(newFocusData)
+        .select()
+        .single()
+
+      console.log('新規作成結果:', { createdData, createError })
+      
+      if (createError) throw createError
+      setFocusData(createdData)
+      console.log('新規フォーカスデータ作成完了:', createdData)
+    } catch (err) {
+      console.error('フォーカス目標作成エラー:', err)
+      setError('フォーカス目標の作成に失敗しました')
+    } finally {
+      setLoading(false)
+    }
+  }, [user, supabase, projectId])
+
   // フォーカス目標更新
   const updateFocusData = useCallback(async (data: Partial<Omit<FocusData, 'id' | 'user_id' | 'created_at'>>) => {
     console.log('=== updateFocusData called ===')
@@ -397,6 +439,7 @@ export function useFocusMode(projectId?: string) {
     error,
     daysRemaining,
     urgencyLevel,
+    createFocusData,
     updateFocusData,
     completeFocus,
     resetFocus,

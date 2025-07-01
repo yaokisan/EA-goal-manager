@@ -22,44 +22,11 @@ import { createClient } from '@/lib/supabase/client'
 import { useAuth } from '@/hooks/useAuth'
 import { FocusData } from '@/hooks/useFocusMode'
 
-// 仮のアーカイブデータ
-const mockArchivedTasks = [
-  {
-    id: '1',
-    name: '初期設計書作成',
-    projectId: '1',
-    projectName: 'プロジェクトA',
-    projectColor: '#667eea',
-    completedAt: '2024-03-15',
-    archivedAt: '2024-04-15',
-    assignee: '山田太郎',
-  },
-  {
-    id: '2',
-    name: 'APIエンドポイント実装',
-    projectId: '1',
-    projectName: 'プロジェクトA',
-    projectColor: '#667eea',
-    completedAt: '2024-03-20',
-    archivedAt: '2024-04-20',
-    assignee: '鈴木花子',
-  },
-  {
-    id: '3',
-    name: '要件定義書レビュー',
-    projectId: '2',
-    projectName: 'プロジェクトB',
-    projectColor: '#ed8936',
-    completedAt: '2024-03-10',
-    archivedAt: '2024-04-10',
-    assignee: '佐藤次郎',
-  },
-]
+// アーカイブデータは実際のタスクから動的に取得
+const mockArchivedTasks: any[] = []
 
 const projects = [
   { id: 'all', name: 'すべてのプロジェクト' },
-  { id: '1', name: 'プロジェクトA' },
-  { id: '2', name: 'プロジェクトB' },
 ]
 
 export default function ArchivePage() {

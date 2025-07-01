@@ -34,6 +34,7 @@ export default function FocusMode({ isVisible, onClose }: FocusModeProps) {
     loading, 
     daysRemaining, 
     urgencyLevel, 
+    createFocusData,
     updateFocusData,
     debugSupabase
   } = useFocusMode()
@@ -67,7 +68,13 @@ export default function FocusMode({ isVisible, onClose }: FocusModeProps) {
     )
   }
   
-  if (!focusData || !focusData.goal || focusData.goal.trim() === '') return null
+  // 初回時（focusDataがnull）の場合は編集モードを自動表示
+  const shouldShowEditor = !focusData || !focusData.goal || focusData.goal.trim() === ''
+
+  if (shouldShowEditor && !isEditing) {
+    // 初回時は自動的に編集モードに入る
+    setIsEditing(true)
+  }
 
   const getUrgencyColor = () => {
     switch (urgencyLevel) {
@@ -90,22 +97,23 @@ export default function FocusMode({ isVisible, onClose }: FocusModeProps) {
 
   const handleSave = async () => {
     try {
-      console.log('=== フォーカスモード保存開始 ===')
-      console.log('保存データ:', editData)
-      
       // データベース構造に合わせて、goal と deadline のみ送信
       const saveData = {
         goal: editData.goal,
         deadline: editData.deadline
       }
-      console.log('実際に送信するデータ:', saveData)
       
-      await updateFocusData(saveData)
+      if (!focusData) {
+        // 新規作成の場合：createFocusDataを呼び出す
+        await createFocusData(saveData)
+      } else {
+        // 更新の場合：updateFocusDataを呼び出す
+        await updateFocusData(saveData)
+      }
+      
       setIsEditing(false)
-      
-      console.log('=== フォーカスモード保存完了 ===')
     } catch (error) {
-      console.error('フォーカス目標の更新に失敗:', error)
+      console.error('フォーカス目標の保存に失敗:', error)
     }
   }
 
