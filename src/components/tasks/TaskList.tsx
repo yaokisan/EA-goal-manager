@@ -56,6 +56,7 @@ interface TaskListProps {
   copyTasksToNotion?: (taskIds: string[]) => string
   createTask?: (data: any) => Promise<any>
   deleteTask?: (id: string) => Promise<void>
+  toggleTaskArchive?: (id: string) => Promise<void>
   loading?: boolean
   onTaskOrderChange?: (updates: { id: string; order_index: number }[], projectId?: string) => Promise<void> // オプショナル
 }
@@ -70,6 +71,7 @@ export default function TaskList({
   copyTasksToNotion: propCopyTasksToNotion,
   createTask: propCreateTask,
   deleteTask: propDeleteTask,
+  toggleTaskArchive: propToggleTaskArchive,
   loading: propLoading,
   onTaskOrderChange
 }: TaskListProps) {
@@ -101,6 +103,7 @@ export default function TaskList({
   const copyTasksToNotion = propCopyTasksToNotion || (() => '')
   const createTask = propCreateTask || (() => Promise.resolve({}))
   const deleteTask = propDeleteTask || (() => Promise.resolve())
+  const toggleTaskArchive = propToggleTaskArchive || (() => Promise.resolve())
   const loading = propLoading || false
 
   // シンプルなフィルタリング（ガントチャートと同じパターン）
@@ -361,6 +364,7 @@ export default function TaskList({
                 onSelect={() => handleSelectTask(task.id)}
                 onCopy={() => handleCopyTask(task.id)}
                 onDelete={() => deleteTask(task.id)}
+                onArchive={() => toggleTaskArchive(task.id)}
                 isMultiSelectMode={isMultiSelectMode}
               />
             ))}
@@ -392,6 +396,7 @@ export default function TaskList({
                   onToggleStatus={() => toggleTaskStatus(task.id)}
                   onCopy={() => handleCopyTask(task.id)}
                   onDelete={() => deleteTask(task.id)}
+                  onArchive={() => toggleTaskArchive(task.id)}
                 />
               ))}
             </div>
@@ -431,7 +436,7 @@ function TaskListFallback({
   showAddButton = true,
   title = 'タスクリスト'
 }: TaskListFallbackProps) {
-  const { tasks, createTask, updateTask, deleteTask, toggleTaskStatus, copyTasksToNotion, loading, updateMultipleTaskOrder } = useTasks(projectId)
+  const { tasks, createTask, updateTask, deleteTask, toggleTaskStatus, toggleTaskArchive, copyTasksToNotion, loading, updateMultipleTaskOrder } = useTasks(projectId)
   const { projects } = useProjects()
   
   // 従来通りのフォールバック実装
@@ -597,6 +602,8 @@ function NewTaskForm({ projectId, projects, availableMembers, onSave, onCancel, 
     end_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 1週間後
     status: 'pending' as const,
     order_index: null as number | null,
+    is_archived: false,
+    archived_at: null as string | null,
   })
 
   const handleSubmit = () => {

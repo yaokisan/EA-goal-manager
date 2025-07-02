@@ -35,6 +35,7 @@ interface SortableTaskCardProps {
   onSelect?: () => void
   onCopy?: () => void
   onDelete?: () => void
+  onArchive?: () => void
   isMultiSelectMode?: boolean
 }
 

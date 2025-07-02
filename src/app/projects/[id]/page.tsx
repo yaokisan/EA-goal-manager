@@ -45,7 +45,7 @@ export default function ProjectEditPage() {
   
   const [members, setMembers] = useState<string[]>([])
   const [newMember, setNewMember] = useState('')
-  const [salesTargets, setSalesTargets] = useState<{ [key: string]: number }>({})
+  const [salesTargets, setSalesTargets] = useState<{ [key: string]: { amount: number | null; qualitative: string | null } }>({})
   
   useEffect(() => {
     if (project) {
@@ -68,9 +68,12 @@ export default function ProjectEditPage() {
   // 売上目標データが更新された時にローカル状態を更新
   useEffect(() => {
     const targets = getProjectSalesTargets(projectId)
-    const targetMap: { [key: string]: number } = {}
+    const targetMap: { [key: string]: { amount: number | null; qualitative: string | null } } = {}
     targets.forEach(target => {
-      targetMap[target.year_month] = target.target_amount
+      targetMap[target.year_month] = {
+        amount: target.target_amount,
+        qualitative: target.qualitative_goal
+      }
     })
     setSalesTargets(targetMap)
   }, [getProjectSalesTargets, projectId])
@@ -249,28 +252,63 @@ export default function ProjectEditPage() {
           </div>
         </div>
 
-        {/* 月別売上目標 */}
+        {/* 月別目標設定 */}
         {getTargetMonths().length > 0 && (
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">月別売上目標</h2>
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">月別目標設定</h2>
             
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="space-y-6">
               {getTargetMonths().map((month) => (
                 <div key={month.key} className="bg-gray-50 p-4 rounded-lg">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    {month.label}
-                  </label>
-                  <input
-                    type="number"
-                    value={salesTargets[month.key] !== undefined ? salesTargets[month.key] : ''}
-                    onChange={(e) => setSalesTargets({
-                      ...salesTargets,
-                      [month.key]: e.target.value === '' ? 0 : parseInt(e.target.value) || 0
-                    })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
-                    placeholder="0"
-                    min="0"
-                  />
+                  <h3 className="text-md font-medium text-gray-900 mb-3">{month.label}</h3>
+                  
+                  <div className="space-y-3">
+                    {/* 売上目標 */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        売上目標
+                      </label>
+                      <div className="flex items-center space-x-2">
+                        <span className="text-gray-500">¥</span>
+                        <input
+                          type="number"
+                          value={salesTargets[month.key]?.amount !== null && salesTargets[month.key]?.amount !== undefined 
+                            ? String(salesTargets[month.key].amount) 
+                            : ''}
+                          onChange={(e) => setSalesTargets({
+                            ...salesTargets,
+                            [month.key]: {
+                              ...salesTargets[month.key],
+                              amount: e.target.value === '' ? null : parseInt(e.target.value) || 0
+                            }
+                          })}
+                          className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                          placeholder="未設定"
+                          min="0"
+                        />
+                      </div>
+                    </div>
+                    
+                    {/* 定性目標 */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        定性目標
+                      </label>
+                      <textarea
+                        value={salesTargets[month.key]?.qualitative || ''}
+                        onChange={(e) => setSalesTargets({
+                          ...salesTargets,
+                          [month.key]: {
+                            ...salesTargets[month.key],
+                            qualitative: e.target.value || null
+                          }
+                        })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                        placeholder="例：新規顧客10社獲得"
+                        rows={2}
+                      />
+                    </div>
+                  </div>
                 </div>
               ))}
             </div>

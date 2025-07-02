@@ -61,11 +61,14 @@ export interface Database {
           id: string
           name: string
           project_id: string
-          assignee: string | null
+          assignees: string[] | null
           start_date: string
           end_date: string
           status: 'pending' | 'completed'
           completed_at: string | null
+          is_archived: boolean
+          archived_at: string | null
+          order_index: number | null
           user_id: string
           created_at: string
           updated_at: string
@@ -74,11 +77,14 @@ export interface Database {
           id?: string
           name: string
           project_id: string
-          assignee?: string | null
+          assignees?: string[] | null
           start_date: string
           end_date: string
           status?: 'pending' | 'completed'
           completed_at?: string | null
+          is_archived?: boolean
+          archived_at?: string | null
+          order_index?: number | null
           user_id: string
           created_at?: string
           updated_at?: string
@@ -87,11 +93,14 @@ export interface Database {
           id?: string
           name?: string
           project_id?: string
-          assignee?: string | null
+          assignees?: string[] | null
           start_date?: string
           end_date?: string
           status?: 'pending' | 'completed'
           completed_at?: string | null
+          is_archived?: boolean
+          archived_at?: string | null
+          order_index?: number | null
           user_id?: string
           created_at?: string
           updated_at?: string
@@ -102,7 +111,8 @@ export interface Database {
           id: string
           project_id: string
           year_month: string
-          target_amount: number
+          target_amount: number | null
+          qualitative_goal: string | null
           user_id: string
           created_at: string
           updated_at: string
@@ -111,7 +121,8 @@ export interface Database {
           id?: string
           project_id: string
           year_month: string
-          target_amount: number
+          target_amount?: number | null
+          qualitative_goal?: string | null
           user_id: string
           created_at?: string
           updated_at?: string
@@ -120,7 +131,8 @@ export interface Database {
           id?: string
           project_id?: string
           year_month?: string
-          target_amount?: number
+          target_amount?: number | null
+          qualitative_goal?: string | null
           user_id?: string
           created_at?: string
           updated_at?: string

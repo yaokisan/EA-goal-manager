@@ -20,14 +20,10 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useAuth } from '@/hooks/useAuth'
+import { useTasks } from '@/hooks/useTasks'
+import { useProjects } from '@/hooks/useProjects'
 import { FocusData } from '@/hooks/useFocusMode'
-
-// アーカイブデータは実際のタスクから動的に取得
-const mockArchivedTasks: any[] = []
-
-const projects = [
-  { id: 'all', name: 'すべてのプロジェクト' },
-]
+import { Task, Project } from '@/types'
 
 export default function ArchivePage() {
   const [selectedProject, setSelectedProject] = useState('all')
@@ -35,10 +31,19 @@ export default function ArchivePage() {
   const [loading, setLoading] = useState(true)
   const supabase = createClient()
   const { user } = useAuth()
+  const { archivedTasks, loading: tasksLoading, toggleTaskArchive } = useTasks()
+  const { projects } = useProjects()
+  
+  
+  // プロジェクトオプションを動的に生成
+  const projectOptions = [
+    { id: 'all', name: 'すべてのプロジェクト' },
+    ...projects.map(p => ({ id: p.id, name: p.name }))
+  ]
   
   const filteredTasks = selectedProject === 'all' 
-    ? mockArchivedTasks 
-    : mockArchivedTasks.filter(task => task.projectId === selectedProject)
+    ? archivedTasks 
+    : archivedTasks.filter(task => task.project_id === selectedProject)
 
   // フォーカスモードアーカイブを取得
   useEffect(() => {
@@ -144,7 +149,7 @@ export default function ArchivePage() {
               onChange={(e) => setSelectedProject(e.target.value)}
               className="rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
             >
-              {projects.map((project) => (
+              {projectOptions.map((project) => (
                 <option key={project.id} value={project.id}>
                   {project.name}
                 </option>
@@ -160,31 +165,50 @@ export default function ArchivePage() {
       
       {/* アーカイブタスクリスト */}
       <div className="space-y-3">
-        {filteredTasks.map((task) => (
-          <div key={task.id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-            <div className="flex items-start justify-between">
-              <div className="flex-1">
-                <h3 className="font-medium text-gray-900 line-through opacity-60">
-                  {task.name}
-                </h3>
-                <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-gray-600">
-                  <span 
-                    className="px-2 py-0.5 rounded text-white"
-                    style={{ backgroundColor: task.projectColor }}
+        {filteredTasks.map((task) => {
+          const project = projects.find(p => p.id === task.project_id)
+          return (
+            <div key={task.id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <h3 className="font-medium text-gray-900 line-through opacity-60">
+                    {task.name}
+                  </h3>
+                  <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-gray-600">
+                    {project && (
+                      <span 
+                        className="px-2 py-0.5 rounded text-white"
+                        style={{ backgroundColor: project.color }}
+                      >
+                        {project.name}
+                      </span>
+                    )}
+                    {task.assignees && task.assignees.length > 0 && (
+                      <span>👤 {task.assignees.join(', ')}</span>
+                    )}
+                    {task.completed_at && (
+                      <span>✅ 完了: {new Date(task.completed_at).toLocaleDateString('ja-JP')}</span>
+                    )}
+                    <span>📊 ステータス: {task.status === 'completed' ? '完了' : '未完了'}</span>
+                  </div>
+                </div>
+                
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => toggleTaskArchive(task.id)}
+                    className="px-2 py-1 text-xs bg-blue-500 hover:bg-blue-600 text-white rounded transition-colors"
+                    title="アーカイブ解除"
                   >
-                    {task.projectName}
+                    解除
+                  </button>
+                  <span className="bg-gray-900 text-white text-xs px-2 py-1 rounded">
+                    {task.archived_at ? new Date(task.archived_at).toLocaleDateString('ja-JP') : 'アーカイブ日未設定'}
                   </span>
-                  <span>👤 {task.assignee}</span>
-                  <span>✅ 完了: {task.completedAt}</span>
                 </div>
               </div>
-              
-              <span className="bg-gray-900 text-white text-xs px-2 py-1 rounded">
-                {task.archivedAt}
-              </span>
             </div>
-          </div>
-        ))}
+          )
+        })}
       </div>
       
       {/* 空状態 */}

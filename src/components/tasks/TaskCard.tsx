@@ -35,6 +35,8 @@ interface TaskCardProps {
   onSelect?: () => void
   onCopy?: () => void
   onDelete?: () => void
+  onArchive?: () => void
+  showArchiveButton?: boolean
 }
 
 export default function TaskCard({
@@ -51,6 +53,8 @@ export default function TaskCard({
   onSelect,
   onCopy,
   onDelete,
+  onArchive,
+  showArchiveButton = true,
 }: TaskCardProps) {
   const editFormRef = useRef<HTMLDivElement>(null)
   const [editData, setEditData] = useState({
@@ -306,6 +310,20 @@ export default function TaskCard({
           >
             📋
           </button>
+          
+          {/* アーカイブボタン */}
+          {showArchiveButton && onArchive && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                onArchive()
+              }}
+              className="text-gray-400 hover:text-blue-600 transition-colors p-1"
+              title={task.is_archived ? "アーカイブを解除" : "アーカイブ"}
+            >
+              {task.is_archived ? "📤" : "📥"}
+            </button>
+          )}
           
           {/* 削除ボタン */}
           {onDelete && (

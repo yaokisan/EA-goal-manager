@@ -41,6 +41,8 @@ export interface Task {
   end_date: string
   status: 'pending' | 'completed'
   completed_at: string | null
+  is_archived: boolean
+  archived_at: string | null
   user_id: string
   order_index: number | null // ドラッグ&ドロップ並び替え用
   created_at: string
@@ -54,7 +56,8 @@ export interface SalesTarget {
   id: string
   project_id: string
   year_month: string // "2024-01"
-  target_amount: number
+  target_amount: number | null
+  qualitative_goal: string | null
   user_id: string
   created_at: string
   updated_at: string

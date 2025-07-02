@@ -51,6 +51,8 @@ interface ProjectTabsProps {
   onTabChange: (tabId: string) => void
   focusMode: boolean
   onFocusModeToggle: () => void
+  selectedAssignee?: string
+  onAssigneeChange?: (assignee: string | undefined) => void
 }
 
 interface TabItem {
@@ -103,7 +105,9 @@ export default function ProjectTabs({
   activeTab: activeTabId,
   onTabChange,
   focusMode,
-  onFocusModeToggle
+  onFocusModeToggle,
+  selectedAssignee,
+  onAssigneeChange
 }: ProjectTabsProps) {
   const { projects } = useProjects()
   const { fetchSalesTargets, getProjectSalesTargets } = useSalesTargets()
@@ -171,6 +175,15 @@ export default function ProjectTabs({
   }
 
   const selectedProject = projects.find(p => p.id === activeTabId)
+  
+  // 全プロジェクトのメンバーを取得（重複を除く）
+  const getAllMembers = () => {
+    const allMembers = new Set<string>()
+    projects.forEach(project => {
+      project.members?.forEach(member => allMembers.add(member))
+    })
+    return Array.from(allMembers).sort()
+  }
   
   // ドラッグ開始ハンドラー
   const handleDragStart = (event: DragStartEvent) => {
@@ -242,7 +255,7 @@ export default function ProjectTabs({
   const getSalesTargetForMonth = (projectId: string, yearMonth: string) => {
     const targets = getProjectSalesTargets(projectId)
     const target = targets.find(t => t.year_month === yearMonth)
-    return target ? target.target_amount : 0
+    return target || null
   }
 
   // ドラッグ中のタブを取得
@@ -276,8 +289,29 @@ export default function ProjectTabs({
               </SortableContext>
             </nav>
           
-          {/* フォーカスモードトグル */}
-          <div className="flex items-center justify-center sm:justify-end px-4 py-2 sm:py-0 border-t sm:border-t-0 border-gray-200 sm:border-none">
+          {/* フィルタとフォーカスモードトグル */}
+          <div className="flex items-center justify-center sm:justify-end px-4 py-2 sm:py-0 border-t sm:border-t-0 border-gray-200 sm:border-none space-x-4">
+            {/* 担当者フィルタ */}
+            {onAssigneeChange && (
+              <div className="flex items-center">
+                <label htmlFor="assignee-filter" className="mr-2 text-sm text-gray-700">
+                  担当者:
+                </label>
+                <select
+                  id="assignee-filter"
+                  value={selectedAssignee || ''}
+                  onChange={(e) => onAssigneeChange(e.target.value || undefined)}
+                  className="text-sm border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">すべて</option>
+                  {getAllMembers().map(member => (
+                    <option key={member} value={member}>{member}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+            
+            {/* フォーカスモードトグル */}
             <label className="flex items-center cursor-pointer">
               <span className="mr-2 text-sm text-gray-700">フォーカスモード</span>
               <input
@@ -310,13 +344,34 @@ export default function ProjectTabs({
           
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
             {getNext3Months().map((month) => {
-              const amount = getSalesTargetForMonth(selectedProject.id, month.yearMonth)
+              const target = getSalesTargetForMonth(selectedProject.id, month.yearMonth)
+              const hasAmount = target && target.target_amount !== null && target.target_amount !== undefined
+              const hasQualitative = target && target.qualitative_goal && target.qualitative_goal.trim() !== ''
+              
               return (
                 <div key={month.yearMonth} className="bg-white rounded p-3">
-                  <div className="text-gray-600">{month.label}</div>
-                  <div className="font-semibold">
-                    {amount > 0 ? `¥${amount.toLocaleString()}` : '未設定'}
-                  </div>
+                  <div className="text-gray-600 mb-1">{month.label}</div>
+                  
+                  {/* 売上目標 */}
+                  {hasAmount && (
+                    <div className="font-semibold">
+                      ¥{target.target_amount!.toLocaleString()}
+                    </div>
+                  )}
+                  
+                  {/* 定性目標 */}
+                  {hasQualitative && (
+                    <div className="text-sm text-gray-700 mt-1">
+                      {target.qualitative_goal}
+                    </div>
+                  )}
+                  
+                  {/* 未設定の場合 */}
+                  {!hasAmount && !hasQualitative && (
+                    <div className="text-gray-400">
+                      未設定
+                    </div>
+                  )}
                 </div>
               )
             })}

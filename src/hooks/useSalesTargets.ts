@@ -17,7 +17,8 @@ export interface SalesTarget {
   id: string
   project_id: string
   year_month: string // "2024-01"
-  target_amount: number
+  target_amount: number | null
+  qualitative_goal: string | null
   user_id: string
   created_at: string
   updated_at: string
@@ -59,7 +60,7 @@ export function useSalesTargets() {
   }, [supabase, user])
 
   // 売上目標の一括保存/更新
-  const saveSalesTargets = useCallback(async (projectId: string, targets: { [yearMonth: string]: number }) => {
+  const saveSalesTargets = useCallback(async (projectId: string, targets: { [yearMonth: string]: { amount: number | null; qualitative: string | null } }) => {
     if (!user) throw new Error('認証が必要です')
     
     setLoading(true)
@@ -73,13 +74,17 @@ export function useSalesTargets() {
         .eq('project_id', projectId)
         .eq('user_id', user.id)
 
-      // 新しい売上目標を挿入
+      // 新しい売上目標を挿入（売上目標または定性目標のいずれかが設定されている場合のみ）
       const targetData = Object.entries(targets)
-        .filter(([_, amount]) => amount >= 0) // 0以上の値を保存（0も含む）
-        .map(([yearMonth, amount]) => ({
+        .filter(([_, target]) => 
+          (target.amount !== null && target.amount !== undefined) || 
+          (target.qualitative !== null && target.qualitative !== undefined && target.qualitative.trim() !== '')
+        )
+        .map(([yearMonth, target]) => ({
           project_id: projectId,
           year_month: yearMonth,
-          target_amount: amount,
+          target_amount: target.amount,
+          qualitative_goal: target.qualitative && target.qualitative.trim() !== '' ? target.qualitative : null,
           user_id: user.id
         }))
 

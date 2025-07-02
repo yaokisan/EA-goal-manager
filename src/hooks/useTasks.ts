@@ -51,6 +51,12 @@ export function useTasks(projectId?: string) {
         assignees: task.assignees || (task.assignee ? [task.assignee] : [])
       }))
       
+      console.log('📊 fetchTasks完了:', {
+        total: tasksWithAssignees.length,
+        archived: tasksWithAssignees.filter(t => t.is_archived).length,
+        active: tasksWithAssignees.filter(t => !t.is_archived).length
+      })
+      
       setAllTasks(tasksWithAssignees)
     } catch (err) {
       console.error('タスク取得エラー:', err)
@@ -133,11 +139,12 @@ export function useTasks(projectId?: string) {
     }
   }, [user, supabase]) // fetchTasksを依存配列から削除して無限ループを防ぐ
 
-  // プロジェクトでフィルタリングしたタスク（order_indexでソート）
+  // プロジェクトでフィルタリングしたタスク（order_indexでソート、アーカイブ済みを除外）
   const tasks = useMemo(() => {
+    const nonArchivedTasks = allTasks.filter(task => !task.is_archived)
     const filtered = projectId 
-      ? allTasks.filter(task => task.project_id === projectId)
-      : allTasks
+      ? nonArchivedTasks.filter(task => task.project_id === projectId)
+      : nonArchivedTasks
     
     // order_indexでソート（nullの場合は末尾に）
     const sorted = filtered.sort((a, b) => {
@@ -386,6 +393,31 @@ export function useTasks(projectId?: string) {
     await updateTask(id, { status: newStatus })
   }, [allTasks, updateTask])
 
+  // タスクアーカイブ切り替え
+  const toggleTaskArchive = useCallback(async (id: string) => {
+    const task = allTasks.find(t => t.id === id)
+    if (!task) {
+      console.error('❌ toggleTaskArchive: タスクが見つかりません:', id)
+      return
+    }
+    
+    const isArchived = !task.is_archived
+    const archivedAt = isArchived ? new Date().toISOString() : null
+    
+    console.log('🗂️ タスクアーカイブ切り替え:', {
+      taskId: id.slice(0, 8),
+      taskName: task.name.slice(0, 20),
+      currentArchived: task.is_archived,
+      newArchived: isArchived,
+      archivedAt
+    })
+    
+    await updateTask(id, { 
+      is_archived: isArchived,
+      archived_at: archivedAt
+    })
+  }, [allTasks, updateTask])
+
   // 単一タスク取得
   const getTask = useCallback((id: string) => {
     return allTasks.find(task => task.id === id)
@@ -423,6 +455,9 @@ export function useTasks(projectId?: string) {
     return notionFormat
   }, [allTasks])
 
+  // アーカイブ済みタスクを計算
+  const archivedTasks = allTasks.filter(task => task.is_archived)
+
   return {
     tasks,
     allTasks,
@@ -440,5 +475,7 @@ export function useTasks(projectId?: string) {
     fetchTasks, // データ再取得用
     updateTaskOrder, // 並び順更新
     updateMultipleTaskOrder, // 複数タスク並び順更新
+    toggleTaskArchive, // アーカイブ切り替え
+    archivedTasks, // アーカイブ済みタスク一覧
   }
 }

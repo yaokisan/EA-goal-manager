@@ -37,6 +37,7 @@ if (process.env.NODE_ENV === 'development') {
 export default function DashboardPage() {
   const [activeTab, setActiveTab] = useState('all')
   const [focusMode, setFocusMode] = useState(false)
+  const [selectedAssignee, setSelectedAssignee] = useState<string | undefined>(undefined)
   // 全てのタスク操作を統一したuseTasks呼び出し
   const { 
     tasks, 
@@ -47,6 +48,7 @@ export default function DashboardPage() {
     copyTasksToNotion,
     createTask,
     deleteTask,
+    toggleTaskArchive,
     loading
   } = useTasks()
   const { projects } = useProjects()
@@ -119,13 +121,23 @@ export default function DashboardPage() {
   }
 
   const getFilteredTasksForGantt = () => {
+    let filteredTasks = tasks
+    
+    // タブによるフィルタリング
     if (activeTab === 'recent') {
-      return getRecentTasks()
-    } else if (activeTab === 'all') {
-      return tasks
-    } else {
-      return tasks.filter(task => task.project_id === activeTab)
+      filteredTasks = getRecentTasks()
+    } else if (activeTab !== 'all') {
+      filteredTasks = tasks.filter(task => task.project_id === activeTab)
     }
+    
+    // 担当者によるフィルタリング
+    if (selectedAssignee) {
+      filteredTasks = filteredTasks.filter(task => 
+        task.assignees && task.assignees.includes(selectedAssignee)
+      )
+    }
+    
+    return filteredTasks
   }
 
   return (
@@ -144,6 +156,8 @@ export default function DashboardPage() {
         onTabChange={handleTabChange}
         focusMode={focusMode}
         onFocusModeToggle={handleFocusModeToggle}
+        selectedAssignee={selectedAssignee}
+        onAssigneeChange={setSelectedAssignee}
       />
       
       {/* フォーカスモード表示エリア */}
@@ -168,6 +182,7 @@ export default function DashboardPage() {
           updateTask={updateTask}
           toggleTaskStatus={toggleTaskStatus}
           deleteTask={deleteTask}
+          toggleTaskArchive={toggleTaskArchive}
           projectId={getCurrentProjectId()}
         />
         
@@ -182,9 +197,11 @@ export default function DashboardPage() {
           copyTasksToNotion={copyTasksToNotion}
           createTask={createTask}
           deleteTask={deleteTask}
+          toggleTaskArchive={toggleTaskArchive}
           loading={loading}
           getRecentTasks={getRecentTasks}
           updateMultipleTaskOrder={updateMultipleTaskOrder}
+          selectedAssignee={selectedAssignee}
         />
       </div>
 
@@ -213,9 +230,11 @@ interface FilteredTaskListProps {
   copyTasksToNotion: (taskIds: string[]) => string
   createTask: (data: any) => Promise<any>
   deleteTask: (id: string) => Promise<void>
+  toggleTaskArchive: (id: string) => Promise<void>
   loading: boolean
   getRecentTasks: () => any[]
   updateMultipleTaskOrder: (updates: { id: string; order_index: number }[], projectId?: string) => Promise<void>
+  selectedAssignee?: string
 }
 
 function FilteredTaskList({ 
@@ -228,10 +247,17 @@ function FilteredTaskList({
   copyTasksToNotion,
   createTask,
   deleteTask,
+  toggleTaskArchive,
   loading,
   getRecentTasks,
-  updateMultipleTaskOrder
+  updateMultipleTaskOrder,
+  selectedAssignee
 }: FilteredTaskListProps) {
+  // 担当者フィルタリングを適用
+  const filteredTasks = selectedAssignee 
+    ? tasks.filter(task => task.assignees && task.assignees.includes(selectedAssignee))
+    : tasks
+
   if (activeTab === 'recent') {
     return (
       <RecentTaskList 
@@ -240,6 +266,8 @@ function FilteredTaskList({
         toggleTaskStatus={toggleTaskStatus}
         copyTasksToNotion={copyTasksToNotion}
         getRecentTasks={getRecentTasks}
+        toggleTaskArchive={toggleTaskArchive}
+        selectedAssignee={selectedAssignee}
       />
     )
   }
@@ -249,12 +277,13 @@ function FilteredTaskList({
       projectId={projectId}
       title={title}
       showAddButton={true}
-      tasks={tasks}
+      tasks={filteredTasks}
       updateTask={updateTask}
       toggleTaskStatus={toggleTaskStatus}
       copyTasksToNotion={copyTasksToNotion}
       createTask={createTask}
       deleteTask={deleteTask}
+      toggleTaskArchive={toggleTaskArchive}
       loading={loading}
       onTaskOrderChange={updateMultipleTaskOrder}
     />
@@ -268,6 +297,8 @@ interface RecentTaskListProps {
   toggleTaskStatus: (id: string) => Promise<void>
   copyTasksToNotion: (taskIds: string[]) => string
   getRecentTasks: () => any[]
+  toggleTaskArchive: (id: string) => Promise<void>
+  selectedAssignee?: string
 }
 
 function RecentTaskList({ 
@@ -275,7 +306,9 @@ function RecentTaskList({
   updateTask, 
   toggleTaskStatus, 
   copyTasksToNotion, 
-  getRecentTasks 
+  getRecentTasks,
+  toggleTaskArchive,
+  selectedAssignee 
 }: RecentTaskListProps) {
   const { projects } = useProjects()
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null)
@@ -283,7 +316,14 @@ function RecentTaskList({
   const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([])
   const [copyFeedback, setCopyFeedback] = useState<string | null>(null)
 
-  const recentTasks = getRecentTasks()
+  let recentTasks = getRecentTasks()
+  
+  // 担当者フィルタリングを適用
+  if (selectedAssignee) {
+    recentTasks = recentTasks.filter(task => 
+      task.assignees && task.assignees.includes(selectedAssignee)
+    )
+  }
 
   const getProjectForTask = (task: any) => {
     return projects.find(p => p.id === task.project_id)
@@ -398,6 +438,7 @@ function RecentTaskList({
               onToggleStatus={() => toggleTaskStatus(task.id)}
               onSelect={() => handleSelectTask(task.id)}
               onCopy={() => handleCopyTask(task.id)}
+              onArchive={() => toggleTaskArchive(task.id)}
             />
           ))
         )}

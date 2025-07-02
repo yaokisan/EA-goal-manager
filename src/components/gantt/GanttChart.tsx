@@ -63,6 +63,7 @@ interface GanttChartProps {
   updateTask?: (id: string, data: Partial<Task>) => Promise<void>
   toggleTaskStatus?: (id: string) => Promise<void>
   deleteTask?: (id: string) => Promise<void>
+  toggleTaskArchive?: (id: string) => Promise<void>
   projectId?: string
 }
 
@@ -109,6 +110,7 @@ export default function GanttChart({
   updateTask,
   toggleTaskStatus,
   deleteTask,
+  toggleTaskArchive,
   projectId
 }: GanttChartProps) {
   // ドラッグ&ドロップセンサー設定
@@ -243,6 +245,11 @@ export default function GanttChart({
       return
     }
     
+    // 直近1週間タブではドラッグ&ドロップによる並び替えを無効化
+    if (activeTab === 'recent') {
+      return
+    }
+    
     const activeIndex = ganttTasks.findIndex(task => task.id === active.id)
     const overIndex = ganttTasks.findIndex(task => task.id === over.id)
     
@@ -291,9 +298,20 @@ export default function GanttChart({
     })
   }, [tasks, projects])
 
+  // 直近1週間タブの場合は終了日が近い順にソート
+  const sortedGanttTasks = useMemo(() => {
+    if (activeTab === 'recent') {
+      return [...ganttTasks].sort((a, b) => {
+        // 終了日が近い順（昇順）
+        return a.endDate.getTime() - b.endDate.getTime()
+      })
+    }
+    return ganttTasks
+  }, [ganttTasks, activeTab])
+
   // 完了タスクと未完了タスクを分離
-  const activeTasks = ganttTasks.filter(task => task.status !== 'completed')
-  const completedTasks = ganttTasks.filter(task => task.status === 'completed')
+  const activeTasks = sortedGanttTasks.filter(task => task.status !== 'completed')
+  const completedTasks = sortedGanttTasks.filter(task => task.status === 'completed')
 
   // 表示期間を決定
   const { minDate, maxDate, totalDays } = useMemo(() => {
@@ -821,6 +839,53 @@ export default function GanttChart({
                         <div className="w-1 h-6 bg-white rounded-full shadow-lg border border-gray-300 hover:bg-gray-50 transition-colors" />
                       </div>
                     </>
+
+                    {/* アクションボタン（完了タスク用） */}
+                    <div 
+                      className={`absolute top-0 flex items-center space-x-1 transition-all duration-200 ${
+                        isSelected || isDragged 
+                          ? 'opacity-100' 
+                          : 'opacity-0 group-hover:opacity-100'
+                      }`}
+                      style={{ 
+                        right: '100%', 
+                        marginRight: '8px',
+                        height: '100%'
+                      }}
+                    >
+                      {/* アーカイブボタン */}
+                      {toggleTaskArchive && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            const originalTask = tasks.find(t => t.id === task.id)
+                            if (originalTask) {
+                              toggleTaskArchive(task.id)
+                            }
+                          }}
+                          className="w-6 h-6 bg-white rounded shadow-lg border border-gray-300 hover:bg-blue-50 hover:border-blue-300 transition-colors flex items-center justify-center text-xs"
+                          title="アーカイブ"
+                        >
+                          📥
+                        </button>
+                      )}
+                      
+                      {/* 削除ボタン */}
+                      {deleteTask && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            if (confirm('このタスクを削除しますか？')) {
+                              deleteTask(task.id)
+                            }
+                          }}
+                          className="w-6 h-6 bg-white rounded shadow-lg border border-gray-300 hover:bg-red-50 hover:border-red-300 transition-colors flex items-center justify-center text-xs"
+                          title="削除"
+                        >
+                          🗑️
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               )
@@ -938,6 +1003,53 @@ export default function GanttChart({
                         <div className="w-1 h-6 bg-white rounded-full shadow-lg border border-gray-300 hover:bg-gray-50 transition-colors" />
                       </div>
                     </>
+
+                    {/* アクションボタン */}
+                    <div 
+                      className={`absolute top-0 flex items-center space-x-1 transition-all duration-200 ${
+                        isSelected || isDragged 
+                          ? 'opacity-100' 
+                          : 'opacity-0 group-hover:opacity-100'
+                      }`}
+                      style={{ 
+                        right: '100%', 
+                        marginRight: '8px',
+                        height: '100%'
+                      }}
+                    >
+                      {/* アーカイブボタン */}
+                      {toggleTaskArchive && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            const originalTask = tasks.find(t => t.id === task.id)
+                            if (originalTask) {
+                              toggleTaskArchive(task.id)
+                            }
+                          }}
+                          className="w-6 h-6 bg-white rounded shadow-lg border border-gray-300 hover:bg-blue-50 hover:border-blue-300 transition-colors flex items-center justify-center text-xs"
+                          title="アーカイブ"
+                        >
+                          📥
+                        </button>
+                      )}
+                      
+                      {/* 削除ボタン */}
+                      {deleteTask && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            if (confirm('このタスクを削除しますか？')) {
+                              deleteTask(task.id)
+                            }
+                          }}
+                          className="w-6 h-6 bg-white rounded shadow-lg border border-gray-300 hover:bg-red-50 hover:border-red-300 transition-colors flex items-center justify-center text-xs"
+                          title="削除"
+                        >
+                          🗑️
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               )
