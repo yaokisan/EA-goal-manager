@@ -5,12 +5,13 @@
  * React Hooks Testing Library を使用
  */
 
+import React from 'react'
 import { renderHook, act } from '@testing-library/react'
 import { createMockTask, createMockProject } from '../utils/test-utils'
 
 // useTasks フックの簡易モック版（テスト用）
 // 実際のテストでは本物のフックをモックして使用
-const mockUseTasks = () => {
+const useMockTasks = () => {
   const [tasks, setTasks] = React.useState<any[]>([])
   const [loading, setLoading] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
@@ -91,7 +92,7 @@ const React = require('react')
 describe('useTasks Hook', () => {
   describe('初期状態', () => {
     it('正しい初期値を返す', () => {
-      const { result } = renderHook(() => mockUseTasks())
+      const { result } = renderHook(() => useMockTasks())
       
       expect(result.current.tasks).toEqual([])
       expect(result.current.allTasks).toEqual([])
@@ -103,7 +104,7 @@ describe('useTasks Hook', () => {
 
   describe('タスク作成', () => {
     it('新しいタスクを作成できる', async () => {
-      const { result } = renderHook(() => mockUseTasks())
+      const { result } = renderHook(() => useMockTasks())
       
       const taskData = {
         name: '新しいタスク',
@@ -121,7 +122,7 @@ describe('useTasks Hook', () => {
     })
 
     it('作成中はloadingがtrueになる', async () => {
-      const { result } = renderHook(() => mockUseTasks())
+      const { result } = renderHook(() => useMockTasks())
       
       const taskData = { name: 'テストタスク' }
 
@@ -135,7 +136,7 @@ describe('useTasks Hook', () => {
 
   describe('タスク更新', () => {
     it('既存のタスクを更新できる', async () => {
-      const { result } = renderHook(() => mockUseTasks())
+      const { result } = renderHook(() => useMockTasks())
       
       // まずタスクを作成
       await act(async () => {
@@ -155,7 +156,7 @@ describe('useTasks Hook', () => {
 
   describe('タスク削除', () => {
     it('タスクを削除できる', async () => {
-      const { result } = renderHook(() => mockUseTasks())
+      const { result } = renderHook(() => useMockTasks())
       
       // タスクを作成
       await act(async () => {
@@ -177,7 +178,7 @@ describe('useTasks Hook', () => {
 
   describe('アーカイブ機能', () => {
     it('タスクをアーカイブできる', async () => {
-      const { result } = renderHook(() => mockUseTasks())
+      const { result } = renderHook(() => useMockTasks())
       
       // タスクを作成
       await act(async () => {
@@ -198,7 +199,7 @@ describe('useTasks Hook', () => {
     })
 
     it('アーカイブされたタスクを元に戻せる', async () => {
-      const { result } = renderHook(() => mockUseTasks())
+      const { result } = renderHook(() => useMockTasks())
       
       // タスクを作成してアーカイブ
       await act(async () => {
