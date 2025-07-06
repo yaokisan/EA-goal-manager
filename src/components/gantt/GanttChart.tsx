@@ -322,9 +322,9 @@ export default function GanttChart({
     
     let resultMinDate: Date, resultMaxDate: Date
     
-    // 直近1週間タブの場合は本日から1週間固定
+    // 直近1週間タブの場合は本日から1週間固定（基準点を他のタブと統一するため1週間前から開始）
     if (activeTab === 'recent') {
-      resultMinDate = new Date(today.getFullYear(), today.getMonth(), today.getDate())
+      resultMinDate = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 7)
       resultMaxDate = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 6)
     }
     else if (focusMode && focusData?.deadline) {
@@ -439,8 +439,8 @@ export default function GanttChart({
     }
   }, [minDate, maxDate])
 
-  // 日付をパーセンテージに変換（タイムゾーン対応）
-  const dateToPercent = (date: Date) => {
+  // 日付を固定ピクセル位置に変換（タイムゾーン対応）
+  const dateToPixels = (date: Date) => {
     // タイムゾーンに依存しない日付のみで計算
     const targetDate = new Date(date.getFullYear(), date.getMonth(), date.getDate())
     const baseDate = new Date(minDate.getFullYear(), minDate.getMonth(), minDate.getDate())
@@ -448,16 +448,16 @@ export default function GanttChart({
     // 日単位での差分を計算
     const daysDiff = Math.floor((targetDate.getTime() - baseDate.getTime()) / (1000 * 60 * 60 * 24))
     
-    // セルの中央に配置するため0.5を加算
-    const percent = ((daysDiff + 0.5) / actualTotalDays) * 100
+    // 1日30px固定 + セルの中央に配置するため15pxオフセット
+    const pixels = daysDiff * 30 + 15
     
-    return Math.max(0, Math.min(100, percent))
+    return Math.max(0, pixels)
   }
 
   // 今日の位置を計算（タイムゾーン対応）
   const now = new Date()
   const todayForCalc = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-  const todayPercent = dateToPercent(todayForCalc)
+  const todayPixels = dateToPixels(todayForCalc)
   
   // グローバルマウスイベントリスナー（actualTotalDays定義後）
   useEffect(() => {
@@ -652,8 +652,7 @@ export default function GanttChart({
                   key={`${month.year}-${month.month}`}
                   className="border-r border-gray-200 last:border-r-0 bg-blue-50"
                   style={{
-                    width: `${(month.days.length / actualTotalDays) * 100}%`,
-                    minWidth: `${month.days.length * 30}px`
+                    width: `${month.days.length * 30}px` // 1日30px固定
                   }}
                 >
                   <div className="p-2 text-center bg-blue-50" style={{ height: '40px' }}>
@@ -669,9 +668,9 @@ export default function GanttChart({
                         key={day.toISOString()}
                         className="text-center flex items-center justify-center border-r border-gray-100 last:border-r-0 bg-blue-50"
                         style={{ 
-                          width: `${(1 / actualTotalDays) * 100}%`,
-                          minWidth: '30px' 
+                          width: '30px' // 1日30px固定
                         }}
+                        data-testid={`date-cell-${day.toISOString().split('T')[0]}`}
                       >
                         <div className="text-xs text-gray-600">
                           {day.getDate()}
@@ -694,31 +693,29 @@ export default function GanttChart({
             onMouseLeave={handleGanttDragEnd}
           >
             {/* 今日の線 */}
-            {todayPercent >= 0 && todayPercent <= 100 && (
-              <div 
-                className="absolute top-0 bottom-0 w-0.5 bg-red-500 z-10"
-                style={{ left: `${todayPercent}%` }}
-              >
-                <div className="absolute -top-12 -left-4 bg-red-500 text-white text-xs px-1 py-0.5 rounded whitespace-nowrap" style={{ fontSize: '10px' }}>
-                  今日
-                </div>
+            <div 
+              className="absolute top-0 bottom-0 w-0.5 bg-red-500 z-10"
+              style={{ left: `${todayPixels}px` }}
+            >
+              <div className="absolute -top-12 -left-4 bg-red-500 text-white text-xs px-1 py-0.5 rounded whitespace-nowrap" style={{ fontSize: '10px' }}>
+                今日
               </div>
-            )}
+            </div>
 
             {/* 週末の背景 */}
             {dateGrid.map((month) => 
               month.days.map((day) => {
                 const dayOfWeek = day.getDay()
                 if (dayOfWeek === 0 || dayOfWeek === 6) {
-                  const leftPercent = dateToPercent(day)
+                  const leftPixels = dateToPixels(day)
                   
                   return (
                     <div
                       key={day.toISOString()}
                       className="absolute top-0 bottom-0 bg-gray-100 opacity-50"
                       style={{
-                        left: `${leftPercent - (1 / actualTotalDays) * 50}%`,
-                        width: `${(1 / actualTotalDays) * 100}%`
+                        left: `${leftPixels - 15}px`, // セル中央オフセットを調整
+                        width: '30px' // 1日分の固定幅
                       }}
                     />
                   )
@@ -737,9 +734,9 @@ export default function GanttChart({
                 ? dragEndDate 
                 : task.endDate
 
-              const startPercent = dateToPercent(currentStartDate)
-              const endPercent = dateToPercent(currentEndDate)
-              const width = endPercent - startPercent
+              const startPixels = dateToPixels(currentStartDate)
+              const endPixels = dateToPixels(currentEndDate)
+              const widthPixels = endPixels - startPixels
               const isSelected = selectedTask === task.id
               const isDragged = draggedTask === task.id
 
@@ -749,8 +746,8 @@ export default function GanttChart({
                   className="absolute flex items-center group"
                   style={{
                     top: `${index * 56 + 16}px`, // 完了タスクは最上部に配置
-                    left: `${startPercent}%`,
-                    width: `${Math.max(width, 5)}%`,
+                    left: `${startPixels}px`,
+                    width: `${Math.max(widthPixels, 30)}px`, // 最小30px
                     height: '24px' // 進捗バーの高さ
                   }}
                 >
@@ -782,7 +779,7 @@ export default function GanttChart({
                     }}
                   >
                     {/* タスク名 */}
-                    {width > 10 && (
+                    {widthPixels > 60 && ( // 60px以上の場合に名前を表示
                       <div className="absolute inset-0 flex items-center px-3 pointer-events-none">
                         <span className="text-white text-sm font-medium truncate line-through">
                           {task.name}
@@ -901,9 +898,9 @@ export default function GanttChart({
                 ? dragEndDate 
                 : task.endDate
 
-              const startPercent = dateToPercent(currentStartDate)
-              const endPercent = dateToPercent(currentEndDate)
-              const width = endPercent - startPercent
+              const startPixels = dateToPixels(currentStartDate)
+              const endPixels = dateToPixels(currentEndDate)
+              const widthPixels = endPixels - startPixels
               const isSelected = selectedTask === task.id
               const isDragged = draggedTask === task.id
 
@@ -913,10 +910,11 @@ export default function GanttChart({
                   className="absolute flex items-center group"
                   style={{
                     top: `${(showCompletedTasks ? completedTasks.length * 56 : 0) + (index * 56) + 16}px`,
-                    left: `${startPercent}%`,
-                    width: `${Math.max(width, 5)}%`,
+                    left: `${startPixels}px`,
+                    width: `${Math.max(widthPixels, 30)}px`, // 最小30px
                     height: '24px'
                   }}
+                  data-testid={`task-bar-${task.id}`}
                 >
                   {/* タスクバー本体 */}
                   <div
@@ -946,7 +944,7 @@ export default function GanttChart({
                     }}
                   >
                     {/* タスク名 */}
-                    {width > 10 && (
+                    {widthPixels > 60 && ( // 60px以上の場合に名前を表示
                       <div className="absolute inset-0 flex items-center px-3 pointer-events-none">
                         <span className="text-white text-sm font-medium truncate">
                           {task.name}
