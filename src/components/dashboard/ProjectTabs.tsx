@@ -312,7 +312,7 @@ export default function ProjectTabs({
             )}
             
             {/* フォーカスモードトグル */}
-            <label className="flex items-center cursor-pointer">
+            <label className="flex items-center cursor-pointer" data-testid="focus-mode-toggle">
               <span className="mr-2 text-sm text-gray-700">フォーカスモード</span>
               <input
                 type="checkbox"
