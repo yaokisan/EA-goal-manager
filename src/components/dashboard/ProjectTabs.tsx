@@ -13,13 +13,15 @@
  * - 直近1週間タブ（赤背景）
  * - すべてタブ
  * - 個別プロジェクトタブ（ドラッグ&ドロップで並び替え可能）
- * - フォーカスモードトグル
+ * - フォーカスモードトグル（同一行配置）
+ * - 担当者フィルタ（同一行配置）
+ * - 水平スクロール対応タブナビゲーション
  * - プロジェクト選択時のKPI表示
  */
 
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { Project } from '@/types'
 import { useProjects } from '@/hooks/useProjects'
 import { useSalesTargets } from '@/hooks/useSalesTargets'
@@ -63,11 +65,12 @@ interface TabItem {
 }
 
 // ドラッグ可能なタブコンポーネント
-function SortableTab({ tab, isActive, getTabStyle, onTabChange }: {
+function SortableTab({ tab, isActive, getTabStyle, onTabChange, dragDisabled = false }: {
   tab: TabItem
   isActive: boolean
   getTabStyle: (tab: TabItem) => string
   onTabChange: (tabId: string) => void
+  dragDisabled?: boolean
 }) {
   const {
     attributes,
@@ -78,7 +81,7 @@ function SortableTab({ tab, isActive, getTabStyle, onTabChange }: {
     isDragging
   } = useSortable({ 
     id: tab.id,
-    disabled: tab.isSpecial // 特別なタブ（直近1週間、すべて）はドラッグ無効
+    disabled: tab.isSpecial || dragDisabled // 特別なタブまたはエラー時はドラッグ無効
   })
 
   const style = {
@@ -94,7 +97,7 @@ function SortableTab({ tab, isActive, getTabStyle, onTabChange }: {
       {...attributes}
       {...listeners}
       onClick={() => onTabChange(tab.id)}
-      className={`${getTabStyle(tab)} whitespace-nowrap flex-shrink-0 ${!tab.isSpecial ? 'cursor-move' : ''}`}
+      className={`${getTabStyle(tab)} whitespace-nowrap flex-shrink-0 ${!tab.isSpecial && !dragDisabled ? 'cursor-move' : ''}`}
     >
       {tab.label}
     </button>
@@ -111,7 +114,7 @@ export default function ProjectTabs({
 }: ProjectTabsProps) {
   const { projects } = useProjects()
   const { fetchSalesTargets, getProjectSalesTargets } = useSalesTargets()
-  const { projectOrder: savedProjectOrder, saveProjectTabOrder, loading: orderLoading } = useProjectTabOrder()
+  const { projectOrder: savedProjectOrder, saveProjectTabOrder, loading: orderLoading, hasTableError } = useProjectTabOrder()
   const [localProjectOrder, setLocalProjectOrder] = useState<string[]>([])
   const [activeId, setActiveId] = useState<string | null>(null)
 
@@ -122,17 +125,43 @@ export default function ProjectTabs({
     }
   }, [savedProjectOrder])
 
-  // プロジェクトの順序を初期化（データベースから取得した順序がない場合のみ）
+  // プロジェクトの順序を初期化（フォールバック機能付き）
   useEffect(() => {
     if (projects.length > 0 && savedProjectOrder.length === 0 && !orderLoading) {
-      // データベースに順序が保存されていない場合、デフォルトの順序で保存
+      // データベースに順序が保存されていない場合、デフォルトの順序で保存を試行
       const defaultOrder = projects.map(p => p.id)
       setLocalProjectOrder(defaultOrder)
-      saveProjectTabOrder(defaultOrder)
+      
+      // フォールバック：データベース保存を試行（失敗しても続行）
+      saveProjectTabOrder(defaultOrder).catch((err) => {
+        console.warn('⚠️ 初期順序のデータベース保存に失敗しましたが、ローカル表示は継続します:', err)
+      })
     }
   }, [projects, savedProjectOrder.length, orderLoading, saveProjectTabOrder])
 
-  // ドラッグ&ドロップセンサー設定
+  // プロジェクト表示順序を決定（フォールバック機能付き）- メモ化
+  const orderedProjects = useMemo((): Project[] => {
+    if (localProjectOrder.length > 0) {
+      // 順序管理が有効な場合
+      const orderedByOrder = localProjectOrder
+        .map(id => projects.find(p => p.id === id))
+        .filter(Boolean) as Project[]
+      
+      // 順序に含まれていないプロジェクトも追加（新規プロジェクト対応）
+      const missingProjects = projects.filter(p => 
+        !localProjectOrder.includes(p.id)
+      )
+      
+      return [...orderedByOrder, ...missingProjects]
+    } else {
+      // フォールバック：デフォルト順序（作成日時順）
+      return [...projects].sort((a, b) => 
+        new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+      )
+    }
+  }, [localProjectOrder, projects])
+
+  // ドラッグ&ドロップセンサー設定（エラー時は無効化）
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
@@ -144,12 +173,8 @@ export default function ProjectTabs({
     })
   )
 
-  // 順序に基づいてプロジェクトタブを並び替え
-  const orderedProjects = localProjectOrder
-    .map(id => projects.find(p => p.id === id))
-    .filter(Boolean) as Project[]
-
-  const tabs: TabItem[] = [
+  // タブリストの生成 - メモ化
+  const tabs: TabItem[] = useMemo(() => [
     { id: 'recent', label: '📅 直近1週間', isSpecial: true },
     { id: 'all', label: 'すべて', isSpecial: true },
     ...orderedProjects.map(project => ({
@@ -158,7 +183,7 @@ export default function ProjectTabs({
       isSpecial: false,
       color: project.color
     }))
-  ]
+  ], [orderedProjects])
 
   const getTabStyle = (tab: TabItem) => {
     const isActive = activeTabId === tab.id
@@ -176,14 +201,14 @@ export default function ProjectTabs({
 
   const selectedProject = projects.find(p => p.id === activeTabId)
   
-  // 全プロジェクトのメンバーを取得（重複を除く）
-  const getAllMembers = () => {
+  // 全プロジェクトのメンバーを取得（重複を除く）- メモ化
+  const getAllMembers = useMemo(() => {
     const allMembers = new Set<string>()
     projects.forEach(project => {
-      project.members?.forEach(member => allMembers.add(member))
+      project.members?.forEach((member: string) => allMembers.add(member))
     })
     return Array.from(allMembers).sort()
-  }
+  }, [projects])
   
   // ドラッグ開始ハンドラー
   const handleDragStart = (event: DragStartEvent) => {
@@ -214,13 +239,13 @@ export default function ProjectTabs({
           // 即座にローカル状態を更新（シームレスなUX）
           setLocalProjectOrder(newOrder)
           
-          // 非同期でデータベースに保存
+          // 非同期でデータベースに保存（フォールバック対応）
           try {
             await saveProjectTabOrder(newOrder)
           } catch (error) {
-            // 保存が失敗した場合はローカル状態をロールバック
-            console.error('❌ プロジェクトタブ順序保存エラー:', error)
-            setLocalProjectOrder(previousOrder)
+            // 保存が失敗した場合でもローカル状態は維持（フォールバック）
+            console.warn('⚠️ プロジェクトタブ順序データベース保存エラー（ローカル状態は維持）:', error)
+            // ローカル状態はロールバックしない（ローカルストレージに保存済み）
           }
         }
       }
@@ -269,10 +294,12 @@ export default function ProjectTabs({
       onDragEnd={handleDragEnd}
     >
       <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-        {/* タブナビゲーション */}
+        {/* タブナビゲーション - 改善されたレイアウト */}
         <div className="border-b border-gray-200">
-          <div className="flex flex-col sm:flex-row">
-            <nav className="flex -mb-px overflow-x-auto">
+          {/* タブとコントロールを同一行に配置：flex items-center justify-between */}
+          <div className="flex items-center justify-between">
+            {/* タブ部分：水平スクロール対応＋フレックス拡張 */}
+            <nav className="flex -mb-px overflow-x-auto flex-1 min-w-0">
               <SortableContext
                 items={tabs.map(tab => tab.id)}
                 strategy={horizontalListSortingStrategy}
@@ -284,27 +311,28 @@ export default function ProjectTabs({
                     isActive={activeTabId === tab.id}
                     getTabStyle={getTabStyle}
                     onTabChange={onTabChange}
+                    dragDisabled={hasTableError}
                   />
                 ))}
               </SortableContext>
             </nav>
           
-          {/* フィルタとフォーカスモードトグル */}
-          <div className="flex items-center justify-center sm:justify-end px-4 py-2 sm:py-0 border-t sm:border-t-0 border-gray-200 sm:border-none space-x-4">
+          {/* コントロール部分：右側固定配置、レスポンシブ対応 */}
+          <div className="flex items-center space-x-2 sm:space-x-4 px-2 sm:px-4 flex-shrink-0">
             {/* 担当者フィルタ */}
             {onAssigneeChange && (
               <div className="flex items-center">
-                <label htmlFor="assignee-filter" className="mr-2 text-sm text-gray-700">
+                <label htmlFor="assignee-filter" className="mr-1 sm:mr-2 text-xs sm:text-sm text-gray-700">
                   担当者:
                 </label>
                 <select
                   id="assignee-filter"
                   value={selectedAssignee || ''}
                   onChange={(e) => onAssigneeChange(e.target.value || undefined)}
-                  className="text-sm border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="text-xs sm:text-sm border border-gray-300 rounded px-1 sm:px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">すべて</option>
-                  {getAllMembers().map(member => (
+                  {getAllMembers.map(member => (
                     <option key={member} value={member}>{member}</option>
                   ))}
                 </select>
@@ -313,7 +341,7 @@ export default function ProjectTabs({
             
             {/* フォーカスモードトグル */}
             <label className="flex items-center cursor-pointer">
-              <span className="mr-2 text-sm text-gray-700">フォーカスモード</span>
+              <span className="mr-1 sm:mr-2 text-xs sm:text-sm text-gray-700">フォーカス</span>
               <input
                 type="checkbox"
                 checked={focusMode}
@@ -321,8 +349,8 @@ export default function ProjectTabs({
                 className="sr-only"
               />
               <div className="relative">
-                <div className={`block w-10 h-6 rounded-full ${focusMode ? 'bg-blue-500' : 'bg-gray-300'}`}></div>
-                <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform ${focusMode ? 'translate-x-5' : 'translate-x-1'}`}></div>
+                <div className={`block w-8 sm:w-10 h-5 sm:h-6 rounded-full ${focusMode ? 'bg-blue-500' : 'bg-gray-300'}`}></div>
+                <div className={`absolute top-0.5 sm:top-1 w-3 sm:w-4 h-3 sm:h-4 bg-white rounded-full transition-transform ${focusMode ? 'translate-x-4 sm:translate-x-5' : 'translate-x-1'}`}></div>
               </div>
             </label>
           </div>
@@ -388,8 +416,16 @@ export default function ProjectTabs({
           </div>
         </div>
       )}
-      
-      {/* すべてタブの説明 */}
+
+      {/* テーブルエラー時の通知 */}
+      {hasTableError && (
+        <div className="p-3 bg-yellow-50 border-b border-gray-200">
+          <div className="flex items-center space-x-2 text-sm text-yellow-700">
+            <span>ℹ️</span>
+            <span>プロジェクト順序管理機能が一時的に利用できません。ローカル表示を使用中です。</span>
+          </div>
+        </div>
+      )}
       </div>
       
       {/* ドラッグオーバーレイ */}

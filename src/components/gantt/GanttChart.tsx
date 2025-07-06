@@ -341,14 +341,14 @@ export default function GanttChart({
       const selectedOption = PERIOD_OPTIONS.find(opt => opt.value === selectedPeriod)
       
       if (selectedOption && selectedOption.value !== 'custom') {
-        // 通常の期間選択（1ヶ月、2ヶ月、3ヶ月）- 常に1週間前から開始
-        resultMinDate = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 7)
+        // 通常の期間選択（1ヶ月、2ヶ月、3ヶ月）- 1ヶ月前から開始に変更
+        resultMinDate = new Date(today.getFullYear(), today.getMonth() - 1, today.getDate())
         resultMaxDate = new Date(today.getFullYear(), today.getMonth(), today.getDate() + selectedOption.days)
       }
       else {
-        // カスタムモード：タスクの期間に基づく（1週間前〜タスク終了後まで、必要に応じて1ヶ月前まで拡張）
+        // カスタムモード：タスクの期間に基づく（1ヶ月前〜タスク終了後まで拡張）
         if (ganttTasks.length === 0) {
-          resultMinDate = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 7)
+          resultMinDate = new Date(today.getFullYear(), today.getMonth() - 1, today.getDate())
           resultMaxDate = new Date(today.getFullYear(), today.getMonth() + 2, today.getDate())
         }
         else {
@@ -356,15 +356,14 @@ export default function GanttChart({
           const taskMinDate = new Date(Math.min(...allDates.map(d => d.getTime())))
           const taskMaxDate = new Date(Math.max(...allDates.map(d => d.getTime())))
           
-          // 1週間前から開始、必要に応じて1ヶ月前まで拡張
-          const oneWeekBefore = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 7)
+          // 1ヶ月前から開始、必要に応じてさらに拡張
           const oneMonthBefore = new Date(today.getFullYear(), today.getMonth() - 1, today.getDate())
           const twoMonthsAfter = new Date(today.getFullYear(), today.getMonth() + 2, today.getDate())
           
-          // カスタムモードでは必要に応じて1ヶ月前まで拡張
-          const minTime = taskMinDate.getTime() < oneWeekBefore.getTime() 
-            ? Math.min(oneMonthBefore.getTime(), taskMinDate.getTime() - 7 * 24 * 60 * 60 * 1000)
-            : oneWeekBefore.getTime()
+          // カスタムモードでは1ヶ月前から開始、必要に応じてさらに拡張
+          const minTime = taskMinDate.getTime() < oneMonthBefore.getTime() 
+            ? taskMinDate.getTime() - 7 * 24 * 60 * 60 * 1000 // タスク開始の1週間前
+            : oneMonthBefore.getTime()
           const maxTime = Math.max(taskMaxDate.getTime() + 7 * 24 * 60 * 60 * 1000, twoMonthsAfter.getTime())
           
           resultMinDate = new Date(minTime)

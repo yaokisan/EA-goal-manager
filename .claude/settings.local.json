@@ -25,7 +25,9 @@
       "Bash(node test-db-schema.js)",
       "Bash(rg:*)",
       "mcp__puppeteer__puppeteer_fill",
-      "Bash(true)"
+      "Bash(true)",
+      "Bash(ls:*)",
+      "Bash(npm audit:*)"
     ],
     "deny": []
   }
