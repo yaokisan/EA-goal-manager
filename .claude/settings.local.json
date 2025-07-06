@@ -27,7 +27,10 @@
       "mcp__puppeteer__puppeteer_fill",
       "Bash(true)",
       "Bash(ls:*)",
-      "Bash(npm audit:*)"
+      "Bash(npm audit:*)",
+      "Bash(git checkout:*)",
+      "Bash(npm test:*)",
+      "Bash(find:*)"
     ],
     "deny": []
   }

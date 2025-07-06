@@ -1,60 +1,81 @@
+/**
+ * Jest設定ファイル
+ * 
+ * Next.js + TypeScript + React Testing Library用の設定
+ * TDD環境をサポートするために必要な設定を含む
+ */
 const nextJest = require('next/jest')
 
 const createJestConfig = nextJest({
-  // Provide the path to your Next.js app to load next.config.js and .env files
+  // Next.jsアプリのディレクトリを指定
   dir: './',
 })
 
-// Add any custom config to be passed to Jest
+// Jestのカスタム設定
 const customJestConfig = {
-  // Add more setup options before each test is run
-  setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
-  
-  // if using TypeScript with a baseUrl set to the root directory then you need the below for alias' to work
-  moduleDirectories: ['node_modules', '<rootDir>/'],
-  
+  // テスト環境の設定
   testEnvironment: 'jsdom',
   
-  // Handle module aliases
+  // セットアップファイル
+  setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
+  
+  // テストファイルのパターン
+  testMatch: [
+    '**/__tests__/**/*.(js|jsx|ts|tsx)',
+    '**/*.(test|spec).(js|jsx|ts|tsx)'
+  ],
+  
+  // テスト対象から除外するディレクトリ
+  testPathIgnorePatterns: [
+    '<rootDir>/.next/',
+    '<rootDir>/node_modules/',
+    '<rootDir>/out/',
+    '<rootDir>/.vercel/'
+  ],
+  
+  // モジュールパスのマッピング
   moduleNameMapper: {
+    '^@/(.*)$': '<rootDir>/src/$1',
     '^@/components/(.*)$': '<rootDir>/src/components/$1',
-    '^@/lib/(.*)$': '<rootDir>/src/lib/$1',
     '^@/hooks/(.*)$': '<rootDir>/src/hooks/$1',
+    '^@/lib/(.*)$': '<rootDir>/src/lib/$1',
     '^@/types/(.*)$': '<rootDir>/src/types/$1',
     '^@/app/(.*)$': '<rootDir>/src/app/$1',
-    '^@/providers/(.*)$': '<rootDir>/src/providers/$1',
-    // Handle CSS imports (with CSS modules)
-    '^.+\\.module\\.(css|sass|scss)$': 'identity-obj-proxy',
-    // Handle CSS imports (without CSS modules)
-    '^.+\\.(css|sass|scss)$': '<rootDir>/__mocks__/fileMock.js',
-    // Handle image imports
-    '^.+\\.(jpg|jpeg|png|gif|webp|avif|svg)$': '<rootDir>/__mocks__/fileMock.js',
+    // CSS/画像ファイルのモック
+    '\\.(css|less|scss|sass)$': 'identity-obj-proxy',
+    '\\.(jpg|jpeg|png|gif|eot|otf|webp|svg|ttf|woff|woff2|mp4|webm|wav|mp3|m4a|aac|oga)$': 
+      '<rootDir>/__mocks__/fileMock.js'
   },
   
-  // Test path patterns
-  testPathIgnorePatterns: ['<rootDir>/.next/', '<rootDir>/node_modules/'],
-  testMatch: [
-    '**/__tests__/**/*.test.{js,jsx,ts,tsx}',
-    '**/?(*.)+(spec|test).{js,jsx,ts,tsx}',
-  ],
-  
-  // Coverage options
+  // カバレッジの設定
   collectCoverageFrom: [
-    'src/components/**/*.{js,jsx,ts,tsx}',
-    'src/lib/**/*.{js,jsx,ts,tsx}',
-    'src/hooks/**/*.{js,jsx,ts,tsx}',
-    'src/app/**/*.{js,jsx,ts,tsx}',
-    '!**/*.d.ts',
-    '!**/node_modules/**',
-    '!**/.next/**',
+    'src/**/*.{js,jsx,ts,tsx}',
+    '!src/**/*.d.ts',
+    '!src/**/index.ts',
+    '!src/app/**/layout.tsx',
+    '!src/app/**/loading.tsx',
+    '!src/app/**/not-found.tsx',
+    '!src/app/**/error.tsx'
   ],
   
-  // Transform options
+  // カバレッジレポート形式
+  coverageReporters: ['html', 'lcov', 'text', 'text-summary'],
+  
+  // カバレッジ閾値
+  coverageThreshold: {
+    global: {
+      branches: 70,
+      functions: 70,
+      lines: 70,
+      statements: 70
+    }
+  },
+  
+  // Supabaseクライアントのモック
   transformIgnorePatterns: [
-    '/node_modules/',
-    '^.+\\.module\\.(css|sass|scss)$',
-  ],
+    'node_modules/(?!(@supabase|uuid|isows)/)' 
+  ]
 }
 
-// createJestConfig is exported this way to ensure that next/jest can load the Next.js config which is async
+// Next.jsの設定とマージしてエクスポート
 module.exports = createJestConfig(customJestConfig)

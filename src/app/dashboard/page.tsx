@@ -71,11 +71,19 @@ export default function DashboardPage() {
 
   // フォーカスモード状態を管理
   useEffect(() => {
-    // フォーカスデータが存在し、有効な目標がある場合のみフォーカスモードをオンにする
-    if (focusData && focusData.goal && focusData.goal.trim() !== '') {
+    // ローカルストレージから状態を復元
+    const savedState = localStorage.getItem('focusMode')
+    
+    if (savedState !== null) {
+      // ローカルストレージに状態がある場合は、それを優先
+      const parsed = JSON.parse(savedState)
+      setFocusMode(parsed)
+    } else if (focusData && focusData.goal && focusData.goal.trim() !== '') {
+      // ローカルストレージに状態がなく、フォーカスデータがある場合のみオンにする
       setFocusMode(true)
       localStorage.setItem('focusMode', JSON.stringify(true))
     } else {
+      // フォーカスデータがない場合はオフにする
       setFocusMode(false)
       localStorage.setItem('focusMode', JSON.stringify(false))
     }
@@ -141,7 +149,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-testid="dashboard">
       {/* ページタイトル */}
       <div>
         <h1 className="text-2xl font-bold text-gray-900">ダッシュボード</h1>
@@ -161,13 +169,17 @@ export default function DashboardPage() {
       />
       
       {/* フォーカスモード表示エリア */}
-      <FocusMode 
-        isVisible={focusMode}
-        onClose={() => {
-          setFocusMode(false)
-          localStorage.setItem('focusMode', JSON.stringify(false))
-        }}
-      />
+      {focusMode && (
+        <div data-testid="focus-mode-display">
+          <FocusMode 
+            isVisible={focusMode}
+            onClose={() => {
+              setFocusMode(false)
+              localStorage.setItem('focusMode', JSON.stringify(false))
+            }}
+          />
+        </div>
+      )}
       
       {/* ガントチャートとタスクリスト */}
       <div className="space-y-6">
